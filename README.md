@@ -14,6 +14,16 @@ A **sandbox** is an ephemeral, isolated compute environment. You create one, run
 > [!WARNING]
 > **Alpha.** This SDK is in active alpha development. The API surface and authentication model may change without notice. Pin exact versions; do not rely on `latest`.
 
+## Interactive CLI
+
+Try sandboxes instantly without writing any code:
+
+```bash
+npx github:adobe/aio-lib-sandbox/run --type cpu:default
+```
+
+See [`run/README.md`](run/README.md) for full CLI documentation and flags.
+
 ## Pre-requisites
 
 To use this library, you must have Sandboxes enabled for your Runtime namespace. Please contact Michael Goberling (mgoberling@adobe.com) or Cosmin Stanciu (stanciu@adobe.com) to request this. 

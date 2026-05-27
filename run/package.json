@@ -1,0 +1,21 @@
+{
+  "name": "@adobe/aio-sandbox-run",
+  "version": "1.1.1",
+  "description": "Interactive CLI for working with Adobe I/O Runtime compute sandboxes",
+  "bin": {
+    "aio-sandbox": "sandbox.js"
+  },
+  "files": [
+    "sandbox.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@adobe/aio-lib-sandbox": "^0.1.0-alpha.4",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
