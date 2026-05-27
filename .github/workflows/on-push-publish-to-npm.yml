@@ -18,7 +18,7 @@ jobs:
           node-version: 24
       - run: npm install
       - run: npm test
-      - uses: JS-DevTools/npm-publish@v1
+      - uses: JS-DevTools/npm-publish@v3
         with:
           token: ${{ secrets.ADOBE_BOT_NPM_TOKEN }}
           tag: alpha
