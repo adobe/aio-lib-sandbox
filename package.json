@@ -8,7 +8,10 @@
     "url": "https://github.com/adobe/aio-lib-sandbox/issues"
   },
   "homepage": "https://github.com/adobe/aio-lib-sandbox",
-  "repository": "https://github.com/adobe/aio-lib-sandbox",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adobe/aio-lib-sandbox.git"
+  },
   "engines": {
     "node": ">=18"
   },
