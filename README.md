@@ -1,7 +1,10 @@
 # App Builder Sandbox SDK
 
 [![Version](https://img.shields.io/npm/v/@adobe/aio-lib-sandbox.svg)](https://npmjs.org/package/@adobe/aio-lib-sandbox)
+[![Downloads/week](https://img.shields.io/npm/dw/@adobe/aio-lib-sandbox.svg)](https://npmjs.org/package/@adobe/aio-lib-sandbox)
+![Node.js CI](https://github.com/adobe/aio-lib-sandbox/workflows/Node.js%20CI/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Codecov Coverage](https://img.shields.io/codecov/c/github/adobe/aio-lib-sandbox/main.svg?style=flat-square)](https://codecov.io/gh/adobe/aio-lib-sandbox/)
 ![Status](https://img.shields.io/badge/status-alpha-orange.svg)
 
 JavaScript SDK for Adobe Runtime Sandboxes.
