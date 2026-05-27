@@ -1,0 +1,23 @@
+name: on-push-publish-to-npm
+
+on:
+  push:
+    branches:
+      - main # Change this if not your default branch
+    paths:
+      - "package.json"
+
+jobs:
+  publish:
+    if: github.repository == 'adobe/aio-lib-sandbox'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm test
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.ADOBE_BOT_NPM_TOKEN }}
