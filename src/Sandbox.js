@@ -73,6 +73,7 @@ class Sandbox {
    * @returns {Promise<Sandbox>} connected sandbox instance
    */
   static async create (options = {}) {
+    console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
 
     const body = {
@@ -126,6 +127,7 @@ class Sandbox {
    * @returns {Promise<Sandbox>} sandbox instance with `status` populated (not WebSocket-connected)
    */
   static async get (sandboxId, options = {}) {
+    console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
     const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox/${sandboxId}`
     const payload = await apiRequest('GET', url, creds.apiKey)
