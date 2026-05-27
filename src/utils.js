@@ -1,0 +1,143 @@
+/*
+Copyright 2026 Adobe. All rights reserved.
+This file is licensed to you under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License. You may obtain a copy
+of the License at http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed under
+the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+OF ANY KIND, either express or implied. See the License for the specific language
+governing permissions and limitations under the License.
+*/
+
+const {
+  SandboxClientError,
+  SandboxInitializationError,
+  SandboxNotFoundError,
+  SandboxUnauthorizedError,
+  SandboxTimeoutError
+} = require('./errors')
+const { SANDBOX_SIZES } = require('./constants')
+
+function buildAuthorizationHeader (apiKey) {
+  return `Basic ${Buffer.from(apiKey).toString('base64')}`
+}
+
+function createSandboxHttpError (status, message) {
+  if (status === 401 || status === 403) {
+    return new SandboxUnauthorizedError(message)
+  }
+  if (status === 404) {
+    return new SandboxNotFoundError(message)
+  }
+  if (status === 504) {
+    return new SandboxTimeoutError(message)
+  }
+  return new SandboxClientError(message)
+}
+
+function normalizeApiHost (host) {
+  if (!host.match(/^https?:\/\//)) {
+    return `https://${host}`
+  }
+  return host
+}
+
+function buildWebSocketEndpoint (apiHost, namespace, sandboxId) {
+  const url = new URL(apiHost)
+  url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
+  url.pathname = `/ws/v1/namespaces/${namespace}/sandbox/${sandboxId}/exec`
+  url.search = ''
+  return url.toString()
+}
+
+/**
+ * Reads Runtime credentials from environment variables, merged with any
+ * explicit overrides. Throws `SandboxInitializationError` for missing values.
+ *
+ * @param {object} overrides explicit credential overrides
+ * @returns {{ apiHost: string, namespace: string, apiKey: string }}
+ */
+function resolveCredentials (overrides = {}) {
+  const apiHost = overrides.apiHost || process.env.__OW_API_HOST
+  const namespace = overrides.namespace || process.env.__OW_NAMESPACE
+  const apiKey = overrides.auth || process.env.__OW_API_KEY
+
+  const missing = []
+  if (!apiHost) missing.push('apiHost')
+  if (!namespace) missing.push('namespace')
+  if (!apiKey) missing.push('auth')
+
+  if (missing.length > 0) {
+    throw new SandboxInitializationError(
+      `Missing required credentials: ${missing.join(', ')}. ` +
+      'Pass them explicitly or set __OW_API_HOST, __OW_NAMESPACE, __OW_API_KEY in the environment.'
+    )
+  }
+
+  return { apiHost: normalizeApiHost(apiHost), namespace, apiKey }
+}
+
+/**
+ * @param {string|object|undefined} size size name or spec object
+ * @returns {string} normalised size name
+ */
+function normalizeSize (size) {
+  if (!size) return 'MEDIUM'
+
+  if (typeof size === 'string' && SANDBOX_SIZES[size]) return size
+
+  if (typeof size === 'object') {
+    const entry = Object.entries(SANDBOX_SIZES).find(
+      ([, v]) => v.cpu === size.cpu && v.memory === size.memory && v.gpu === size.gpu
+    )
+    if (entry) return entry[0]
+  }
+
+  throw new SandboxClientError('Invalid sandbox size provided')
+}
+
+/**
+ * Thin fetch wrapper around the management REST API.
+ *
+ * Uses the Node.js global `fetch` (available since Node 18).
+ *
+ * @param {string} method HTTP method
+ * @param {string} url full request URL
+ * @param {string} apiKey API key for Basic auth
+ * @param {object|undefined} body request body (JSON-encoded when present)
+ * @returns {Promise<object>} parsed response JSON
+ */
+async function apiRequest (method, url, apiKey, body) {
+  const headers = { Authorization: buildAuthorizationHeader(apiKey) }
+  const init = { method, headers }
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify(body)
+  }
+
+  let response
+  try {
+    response = await fetch(url, init)
+  } catch (error) {
+    throw new SandboxClientError(`Sandbox API request failed: ${error.message}`)
+  }
+
+  if (!response.ok) {
+    const text = await response.text()
+    const detail = `${response.status}${text ? ` ${text}` : ''}`
+    throw createSandboxHttpError(response.status, detail)
+  }
+
+  return response.json()
+}
+
+module.exports = {
+  buildAuthorizationHeader,
+  createSandboxHttpError,
+  normalizeApiHost,
+  buildWebSocketEndpoint,
+  resolveCredentials,
+  normalizeSize,
+  apiRequest
+}

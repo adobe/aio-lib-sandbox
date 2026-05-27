@@ -1,0 +1,26 @@
+{
+  "name": "@adobe/aio-lib-sandbox",
+  "version": "0.1.0-alpha.0",
+  "description": "JavaScript SDK for Adobe Runtime Sandboxes",
+  "main": "src/index.js",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/adobe/aio-lib-sandbox/issues"
+  },
+  "homepage": "https://github.com/adobe/aio-lib-sandbox",
+  "repository": "https://github.com/adobe/aio-lib-sandbox",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "jest": "^29",
+    "jest-junit": "^16.0.0"
+  },
+  "scripts": {
+    "test": "jest --ci",
+    "lint": "node --check src/**/*.js"
+  }
+}
