@@ -26,7 +26,7 @@ npm install @adobe/aio-lib-sandbox@alpha
 
 ## Quickstart
 
-Inside a Runtime action, credentials are read automatically from the environment.
+Inside a Runtime action, no configuration is needed to use the SDK as credentials are read automatically from the environment.
 
 ```js
 const { Sandbox } = require('@adobe/aio-lib-sandbox')
