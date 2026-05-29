@@ -259,6 +259,42 @@ describe('Sandbox', () => {
       expect(body.policy).toEqual(policy)
     })
 
+    test('forwards ports and populates previewUrls from the response', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-ports',
+          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-ports/exec',
+          status: 'ready',
+          token: 'tok-ports',
+          maxLifetime: 3600,
+          previewUrls: {
+            3000: 'https://sb-ports-3000.preview.example.net',
+            8080: 'https://sb-ports-8080.preview.example.net'
+          }
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        name: 'ports-sandbox',
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key',
+        ports: [3000, 8080]
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-ports' })
+      const sandbox = await createPromise
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.ports).toEqual([3000, 8080])
+      expect(sandbox.getUrl(3000)).toBe('https://sb-ports-3000.preview.example.net')
+      expect(sandbox.getUrl(8080)).toBe('https://sb-ports-8080.preview.example.net')
+    })
+
     test('reads credentials from env vars', async () => {
       process.env.__OW_API_HOST = 'https://runtime.example.net'
       process.env.__OW_NAMESPACE = 'ns'
