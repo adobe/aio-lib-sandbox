@@ -48,7 +48,6 @@ class Sandbox {
     this.apiKey = options.apiKey
     this.token = options.token
     // previewUrls is a Map<number, string> of (port → URL) returned by the server.
-    // Populated by create(), get(). Safe for callers to iterate.
     this.previewUrls = options.previewUrls || new Map()
     this.managementEndpoint = options.managementEndpoint || null
     this.ws = null
@@ -415,7 +414,8 @@ class Sandbox {
    *
    * @param {number} port port number (1–65535)
    * @returns {string} public preview URL
-   * @throws {SandboxPortNotProvisionedError} when `port` was not declared in `create({ ports })`
+   * @throws {SandboxPortNotProvisionedError} when `port` is invalid or was not
+   *   declared in `create({ ports })`
    */
   getUrl (port) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -428,7 +428,7 @@ class Sandbox {
     if (url === undefined) {
       throw new SandboxPortNotProvisionedError(
         `Port ${port} was not provisioned for sandbox '${this.id}'. ` +
-        'Declare it in create({ ports: [...] }) to get a preview URL.'
+        "Declare it in create({ ports: [...] }) to get a preview URL."
       )
     }
 
