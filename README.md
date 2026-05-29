@@ -75,6 +75,7 @@ const sandbox = await Sandbox.create({
   name:        'my-sandbox',
   type:        'cpu:default',
   maxLifetime: 3600,
+  ports:       [3000, 8080],
   envs:        { API_KEY: 'your-api-key' }
 })
 ```
@@ -149,11 +150,20 @@ await sandbox.destroy()
 
 ### Preview URLs
 
-Use preview URLs to get access to servers or web services running in a sandbox on a particular port: 
+Ports that should be publicly accessible must be declared at creation time via the `ports` array.
 
 ```js
-const url = await sandbox.getUrl({port: 3000})
-console.log("preview:", url)
+const sandbox = await Sandbox.create({
+  name:  'web-sandbox',
+  ports: [3000, 8080]
+})
+
+// Start a server inside the sandbox on the declared port
+await sandbox.exec('node server.js &', { timeout: 50_000 })
+
+// Retrieve the pre-provisioned preview URL — synchronous, no network call
+const url = sandbox.getUrl(3000)
+console.log('preview:', url)
 // https://sb-abc123-va6-0-xK3mPq2nAeB-3000.sandbox-adobeioruntime.net
 ```
 
