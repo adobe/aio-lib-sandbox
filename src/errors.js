@@ -26,6 +26,7 @@ class SandboxUnauthorizedError extends SandboxSDKError {}
 class SandboxTimeoutError extends SandboxSDKError {}
 class SandboxWebSocketError extends SandboxSDKError {}
 class SandboxPortNotProvisionedError extends SandboxSDKError {}
+class SandboxInvalidPortError extends SandboxClientError {}
 
 module.exports = {
   SandboxSDKError,
@@ -35,5 +36,6 @@ module.exports = {
   SandboxUnauthorizedError,
   SandboxTimeoutError,
   SandboxWebSocketError,
-  SandboxPortNotProvisionedError
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError
 }

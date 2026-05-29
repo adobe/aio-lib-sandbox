@@ -17,6 +17,7 @@ const {
   SandboxInitializationError,
   SandboxNotFoundError,
   SandboxPortNotProvisionedError,
+  SandboxInvalidPortError,
   SandboxTimeoutError,
   SandboxUnauthorizedError,
   SandboxWebSocketError
@@ -709,14 +710,22 @@ describe('Sandbox', () => {
       expect(() => sandbox.getUrl(9999)).toThrow(SandboxPortNotProvisionedError)
     })
 
-    test('throws SandboxPortNotProvisionedError for invalid port', () => {
+    test('throws SandboxInvalidPortError for out-of-range port', () => {
       const sandbox = new Sandbox({
         ...BASE_OPTIONS,
         previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
       })
-      expect(() => sandbox.getUrl(0)).toThrow(SandboxPortNotProvisionedError)
-      expect(() => sandbox.getUrl(70000)).toThrow(SandboxPortNotProvisionedError)
-      expect(() => sandbox.getUrl('abc')).toThrow(SandboxPortNotProvisionedError)
+      expect(() => sandbox.getUrl(0)).toThrow(SandboxInvalidPortError)
+      expect(() => sandbox.getUrl(65536)).toThrow(SandboxInvalidPortError)
+    })
+
+    test('throws SandboxInvalidPortError for non-integer port', () => {
+      const sandbox = new Sandbox({
+        ...BASE_OPTIONS,
+        previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
+      })
+      expect(() => sandbox.getUrl('abc')).toThrow(SandboxInvalidPortError)
+      expect(() => sandbox.getUrl(3000.5)).toThrow(SandboxInvalidPortError)
     })
   })
 

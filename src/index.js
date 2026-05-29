@@ -18,7 +18,8 @@ const {
   SandboxUnauthorizedError,
   SandboxTimeoutError,
   SandboxWebSocketError,
-  SandboxPortNotProvisionedError
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError
 } = require('./errors')
 
 module.exports = {
@@ -30,5 +31,6 @@ module.exports = {
   SandboxUnauthorizedError,
   SandboxTimeoutError,
   SandboxWebSocketError,
-  SandboxPortNotProvisionedError
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError
 }

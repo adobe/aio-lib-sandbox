@@ -14,7 +14,8 @@ const {
   SandboxClientError,
   SandboxTimeoutError,
   SandboxWebSocketError,
-  SandboxPortNotProvisionedError
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError
 } = require('./errors')
 const {
   buildWebSocketEndpoint,
@@ -414,12 +415,14 @@ class Sandbox {
    *
    * @param {number} port port number (1–65535)
    * @returns {string} public preview URL
-   * @throws {SandboxPortNotProvisionedError} when `port` is invalid or was not
+   * @throws {SandboxInvalidPortError} when `port` is not an integer in the
+   *   range 1–65535
+   * @throws {SandboxPortNotProvisionedError} when `port` is valid but was not
    *   declared in `create({ ports })`
    */
   getUrl (port) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new SandboxPortNotProvisionedError(
+      throw new SandboxInvalidPortError(
         `Invalid port '${port}': must be an integer between 1 and 65535`
       )
     }
