@@ -17,6 +17,8 @@ const {
   SandboxCommandNotFoundError,
   SandboxInitializationError,
   SandboxNotFoundError,
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError,
   SandboxTimeoutError,
   SandboxUnauthorizedError,
   SandboxWebSocketError
@@ -263,6 +265,42 @@ describe('Sandbox', () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body)
       expect(body.policy).toEqual(policy)
+    })
+
+    test('forwards ports and populates previewUrls from the response', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-ports',
+          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-ports/exec',
+          status: 'ready',
+          token: 'tok-ports',
+          maxLifetime: 3600,
+          previewUrls: {
+            3000: 'https://sb-ports-3000.preview.example.net',
+            8080: 'https://sb-ports-8080.preview.example.net'
+          }
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        name: 'ports-sandbox',
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key',
+        ports: [3000, 8080]
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-ports' })
+      const sandbox = await createPromise
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.ports).toEqual([3000, 8080])
+      expect(sandbox.getUrl(3000)).toBe('https://sb-ports-3000.preview.example.net')
+      expect(sandbox.getUrl(8080)).toBe('https://sb-ports-8080.preview.example.net')
     })
 
     test('reads credentials from env vars', async () => {
@@ -692,45 +730,40 @@ describe('Sandbox', () => {
   // -------------------------------------------------------------------------
 
   describe('getUrl()', () => {
-    test('resolves preview URL from previewUrls', async () => {
+    test('resolves preview URL from previewUrls map', () => {
       const sandbox = new Sandbox({
         ...BASE_OPTIONS,
-        previewUrls: {
-          3000: 'https://sb-test-3000.preview.example.net'
-        }
+        previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
       })
 
-      const url = await sandbox.getUrl({ port: 3000 })
+      const url = sandbox.getUrl(3000)
       expect(url).toBe('https://sb-test-3000.preview.example.net')
     })
 
-    test('replaces scheme when protocol option provided', async () => {
+    test('throws SandboxPortNotProvisionedError when port was not provisioned', () => {
       const sandbox = new Sandbox({
         ...BASE_OPTIONS,
-        previewUrls: {
-          3000: 'https://sb-test-3000.preview.example.net'
-        }
+        previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
       })
-
-      const url = await sandbox.getUrl({ port: 3000, protocol: 'wss' })
-      expect(url).toBe('wss://sb-test-3000.preview.example.net')
+      expect(() => sandbox.getUrl(9999)).toThrow(SandboxPortNotProvisionedError)
     })
 
-    test('throws SandboxClientError when preview URL is absent for port', async () => {
-      const sandbox = new Sandbox(BASE_OPTIONS)
-      await expect(sandbox.getUrl({ port: 3000 })).rejects.toThrow(SandboxClientError)
-    })
-
-    test('throws SandboxClientError for invalid port', async () => {
+    test('throws SandboxInvalidPortError for out-of-range port', () => {
       const sandbox = new Sandbox({
         ...BASE_OPTIONS,
-        previewUrls: {
-          3000: 'https://sb-test-3000.preview.example.net'
-        }
+        previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
       })
-      await expect(sandbox.getUrl({ port: 0 })).rejects.toThrow(SandboxClientError)
-      await expect(sandbox.getUrl({ port: 70000 })).rejects.toThrow(SandboxClientError)
-      await expect(sandbox.getUrl({ port: 'abc' })).rejects.toThrow(SandboxClientError)
+      expect(() => sandbox.getUrl(0)).toThrow(SandboxInvalidPortError)
+      expect(() => sandbox.getUrl(65536)).toThrow(SandboxInvalidPortError)
+    })
+
+    test('throws SandboxInvalidPortError for non-integer port', () => {
+      const sandbox = new Sandbox({
+        ...BASE_OPTIONS,
+        previewUrls: new Map([[3000, 'https://sb-test-3000.preview.example.net']])
+      })
+      expect(() => sandbox.getUrl('abc')).toThrow(SandboxInvalidPortError)
+      expect(() => sandbox.getUrl(3000.5)).toThrow(SandboxInvalidPortError)
     })
   })
 
