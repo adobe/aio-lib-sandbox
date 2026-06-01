@@ -494,7 +494,15 @@ class Sandbox {
   async destroy() {
     const base = this.managementEndpoint || this.apiHost
     const url = `${base}/api/v1/namespaces/${this.namespace}/sandbox/${this.id}`
-    const payload = await apiRequest('DELETE', url, this.apiKey)
+    this.ws?.beginIntentionalClose()
+
+    let payload
+    try {
+      payload = await apiRequest('DELETE', url, this.apiKey)
+    } catch (error) {
+      this.ws?.cancelIntentionalClose()
+      throw error
+    }
 
     this.status = payload.status || this.status
     this.ws?.close()

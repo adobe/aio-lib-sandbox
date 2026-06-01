@@ -37,6 +37,7 @@ class SandboxSocket {
 
     this.socket = null
     this.connectPromise = null
+    this.intentionalClose = false
 
     /**
      * Pending exec entries
@@ -100,6 +101,10 @@ class SandboxSocket {
       const onClose = (code) => {
         cleanup()
         this.connectPromise = null
+        if (this.intentionalClose) {
+          resolve()
+          return
+        }
         reject(this.createCloseError(code))
       }
 
@@ -146,9 +151,27 @@ class SandboxSocket {
   }
 
   /**
-   * Closes the underlying socket.
+   * Marks the next socket close as expected by the caller.
    */
-  close () {
+  beginIntentionalClose () {
+    this.intentionalClose = true
+  }
+
+  /**
+   * Clears a previously requested intentional close.
+   */
+  cancelIntentionalClose () {
+    this.intentionalClose = false
+  }
+
+  /**
+   * Closes the underlying socket.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.intentional] whether pending work should be drained without error
+   */
+  close ({ intentional = false } = {}) {
+    if (intentional) this.beginIntentionalClose()
     this.socket?.close()
   }
 
@@ -243,6 +266,35 @@ class SandboxSocket {
     pending.reject(error)
   }
 
+  /**
+   * Resolves and removes a pending exec during an intentional sandbox shutdown.
+   *
+   * @param {string} execId
+   */
+  resolveExecOnIntentionalClose (execId) {
+    const pending = this.pendingExecs.get(execId)
+    if (!pending) return
+    this.pendingExecs.delete(execId)
+    clearTimeout(pending.timeout)
+
+    const result = { exitCode: null, destroyed: true }
+    if (pending.detached) {
+      if (!pending.resolved) {
+        pending.resolved = true
+        pending.resolve({ pid: undefined, startedAt: undefined, destroyed: true })
+      }
+      if (pending.waitResolve) pending.waitResolve(result)
+      return
+    }
+
+    pending.resolve({
+      execId,
+      stdout: pending.stdout,
+      stderr: pending.stderr,
+      ...result
+    })
+  }
+
   handleMessage (message) {
     const frame = this.parseFrame(message)
     if (!frame || this.isAuthAckFrame(frame)) return
@@ -264,6 +316,24 @@ class SandboxSocket {
   }
 
   handleClose (code) {
+    if (this.intentionalClose) {
+      for (const execId of [...this.pendingExecs.keys()]) {
+        this.resolveExecOnIntentionalClose(execId)
+      }
+      for (const [, pending] of [...this.pendingFileOps.entries()]) {
+        pending.resolve(undefined)
+      }
+      for (const [, pending] of [...this.pendingGetOps.entries()]) {
+        pending.resolve(null)
+      }
+      this.pendingFileOps.clear()
+      this.pendingGetOps.clear()
+      this.connectPromise = null
+      this.socket = null
+      this.intentionalClose = false
+      return
+    }
+
     const error = this.createCloseError(code)
     for (const execId of [...this.pendingExecs.keys()]) {
       this.rejectExec(execId, error)

@@ -790,6 +790,51 @@ describe('Sandbox', () => {
       )
     })
 
+    test('resolves pending foreground exec when destroy closes the socket', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'destroyed' })
+      })
+
+      const sandbox = await buildConnectedSandbox()
+      const execPromise = sandbox.exec('sleep 100')
+      const runFrame = JSON.parse(sockets[0].sent[1])
+
+      await sandbox.destroy()
+
+      await expect(execPromise).resolves.toEqual({
+        execId: runFrame.execId,
+        stdout: '',
+        stderr: '',
+        exitCode: null,
+        destroyed: true
+      })
+    })
+
+    test('resolves detached wait when sandbox destroy triggers a 1005 socket close', async () => {
+      const sandbox = await buildConnectedSandbox()
+      global.fetch = jest.fn().mockImplementation(async () => {
+        sockets[0].closeWith(1005)
+        return {
+          ok: true,
+          json: () => Promise.resolve({ status: 'destroyed' })
+        }
+      })
+
+      const commandPromise = sandbox.exec('sleep infinity', { detached: true })
+      const runFrame = JSON.parse(sockets[0].sent[1])
+      sockets[0].message({ type: 'exec.detached', execId: runFrame.execId, pid: 1234, startedAt: 100 })
+      const command = await commandPromise
+      const waitPromise = command.wait()
+
+      await sandbox.destroy()
+
+      await expect(waitPromise).resolves.toEqual({
+        exitCode: null,
+        destroyed: true
+      })
+    })
+
     test('throws SandboxUnauthorizedError on 403', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
