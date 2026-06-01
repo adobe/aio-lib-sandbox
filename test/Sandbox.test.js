@@ -464,6 +464,29 @@ describe('Sandbox', () => {
       await expect(p).rejects.toThrow(SandboxWebSocketError)
       await expect(p).rejects.toThrow('ECONNREFUSED')
     })
+
+    test('rejects when auth frame cannot be sent after open', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      const p = sandbox.connect()
+      sockets[0].send = () => { throw new Error('broken auth send') }
+
+      sockets[0].open()
+
+      await expect(p).rejects.toThrow(SandboxWebSocketError)
+      await expect(p).rejects.toThrow('broken auth send')
+    })
+
+    test('resolves in-flight connect when socket is intentionally closed', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      const p = sandbox.connect()
+      const [routeClose] = sockets[0].listeners('close')
+      sockets[0].off('close', routeClose)
+
+      sandbox.ws.beginIntentionalClose()
+      sockets[0].closeWith(1000)
+
+      await expect(p).resolves.toBeUndefined()
+    })
   })
 
   // -------------------------------------------------------------------------
@@ -668,6 +691,18 @@ describe('Sandbox', () => {
 
       await expect(filePromise).rejects.toThrow(SandboxClientError)
     })
+
+    test('rejects when socket is not open', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      await expect(sandbox.readFile('/file.txt')).rejects.toThrow(SandboxWebSocketError)
+    })
+
+    test('rejects when socket.send throws', async () => {
+      const sandbox = await buildConnectedSandbox()
+      sockets[0].send = () => { throw new Error('broken pipe') }
+
+      await expect(sandbox.readFile('/file.txt')).rejects.toThrow(SandboxWebSocketError)
+    })
   })
 
   describe('writeFile()', () => {
@@ -694,6 +729,18 @@ describe('Sandbox', () => {
       sockets[0].message({ type: 'file.writeResult', execId: frame.execId, path: frame.path, ok: false })
 
       await expect(writePromise).rejects.toThrow(SandboxClientError)
+    })
+
+    test('rejects when socket is not open', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      await expect(sandbox.writeFile('/file.txt', 'content')).rejects.toThrow(SandboxWebSocketError)
+    })
+
+    test('rejects when socket.send throws', async () => {
+      const sandbox = await buildConnectedSandbox()
+      sockets[0].send = () => { throw new Error('broken pipe') }
+
+      await expect(sandbox.writeFile('/file.txt', 'content')).rejects.toThrow(SandboxWebSocketError)
     })
   })
 
@@ -722,6 +769,18 @@ describe('Sandbox', () => {
       sockets[0].message({ type: 'file.entries', execId: frame.execId })
 
       expect(await listPromise).toEqual([])
+    })
+
+    test('rejects when socket is not open', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      await expect(sandbox.listFiles('/workspace')).rejects.toThrow(SandboxWebSocketError)
+    })
+
+    test('rejects when socket.send throws', async () => {
+      const sandbox = await buildConnectedSandbox()
+      sockets[0].send = () => { throw new Error('broken pipe') }
+
+      await expect(sandbox.listFiles('/workspace')).rejects.toThrow(SandboxWebSocketError)
     })
   })
 
@@ -811,6 +870,46 @@ describe('Sandbox', () => {
       })
     })
 
+    test('resolves pending detached exec ack when destroy closes before exec.detached', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'destroyed' })
+      })
+
+      const sandbox = await buildConnectedSandbox()
+      const commandPromise = sandbox.exec('sleep infinity', { detached: true })
+
+      await sandbox.destroy()
+
+      const command = await commandPromise
+      expect(command).toMatchObject({
+        execId: expect.any(String),
+        pid: undefined,
+        startedAt: undefined,
+        detached: true
+      })
+      await expect(command.wait()).resolves.toEqual({
+        exitCode: null,
+        destroyed: true
+      })
+    })
+
+    test('resolves pending file and getCommand operations when destroy closes socket', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'destroyed' })
+      })
+
+      const sandbox = await buildConnectedSandbox()
+      const filePromise = sandbox.readFile('/workspace/file.txt')
+      const commandPromise = sandbox.getCommand('exec-running')
+
+      await sandbox.destroy()
+
+      await expect(filePromise).resolves.toBeUndefined()
+      await expect(commandPromise).resolves.toBeNull()
+    })
+
     test('resolves detached wait when sandbox destroy triggers a 1005 socket close', async () => {
       const sandbox = await buildConnectedSandbox()
       global.fetch = jest.fn().mockImplementation(async () => {
@@ -875,6 +974,32 @@ describe('Sandbox', () => {
       expect(typeof command.kill).toBe('function')
       expect(typeof command.writeStdin).toBe('function')
       expect(typeof command.closeStdin).toBe('function')
+    })
+
+    test('command object writeStdin / closeStdin / kill delegate to sandbox', async () => {
+      const sandbox = await buildConnectedSandbox()
+
+      const commandPromise = sandbox.exec('tail -f /log', { detached: true })
+      const runFrame = JSON.parse(sockets[0].sent[1])
+      sockets[0].message({ type: 'exec.detached', execId: runFrame.execId, pid: 42, startedAt: 1000 })
+      const command = await commandPromise
+
+      command.writeStdin('hello\n')
+      const inputFrame = JSON.parse(sockets[0].sent[sockets[0].sent.length - 1])
+      expect(inputFrame.type).toBe('exec.input')
+      expect(inputFrame.execId).toBe(runFrame.execId)
+      expect(inputFrame.data).toBe('hello\n')
+
+      command.closeStdin()
+      const endFrame = JSON.parse(sockets[0].sent[sockets[0].sent.length - 1])
+      expect(endFrame.type).toBe('exec.endInput')
+      expect(endFrame.execId).toBe(runFrame.execId)
+
+      command.kill('SIGINT')
+      const killFrame = JSON.parse(sockets[0].sent[sockets[0].sent.length - 1])
+      expect(killFrame.type).toBe('exec.kill')
+      expect(killFrame.execId).toBe(runFrame.execId)
+      expect(killFrame.signal).toBe('SIGINT')
     })
 
     test('wait() resolves with exitCode when exec.exit arrives', async () => {
@@ -1006,6 +1131,14 @@ describe('Sandbox', () => {
     test('rejects when socket is not open', async () => {
       const sandbox = new Sandbox(BASE_OPTIONS)
       await expect(sandbox.getCommand('exec-x')).rejects.toThrow(SandboxWebSocketError)
+    })
+
+    test('rejects and clears pending get operation when socket.send throws', async () => {
+      const sandbox = await buildConnectedSandbox()
+      sockets[0].send = () => { throw new Error('broken pipe') }
+
+      await expect(sandbox.getCommand('exec-x')).rejects.toThrow(SandboxWebSocketError)
+      expect(sandbox.ws.pendingGetOps.has('exec-x')).toBe(false)
     })
 
     test('reuses existing wait promise when exec is already running in same session', async () => {
