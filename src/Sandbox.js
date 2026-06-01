@@ -13,7 +13,9 @@ const crypto = require('node:crypto')
 const {
   SandboxClientError,
   SandboxTimeoutError,
-  SandboxWebSocketError
+  SandboxWebSocketError,
+  SandboxPortNotProvisionedError,
+  SandboxInvalidPortError
 } = require('./errors')
 const {
   buildWebSocketEndpoint,
@@ -46,7 +48,8 @@ class Sandbox {
     this.apiHost = options.apiHost
     this.apiKey = options.apiKey
     this.token = options.token
-    this.publicUrlTemplate = options.publicUrlTemplate || null
+    // previewUrls is a Map<number, string> of (port → URL) returned by the server.
+    this.previewUrls = options.previewUrls || new Map()
     this.managementEndpoint = options.managementEndpoint || null
     this.ws = null
   }
@@ -68,6 +71,7 @@ class Sandbox {
    * @param {string} [options.type] sandbox type (default: `'cpu:default'`)
    * @param {string|object} [options.size] sandbox size tier (name or spec object)
    * @param {number} [options.maxLifetime] maximum lifetime in seconds
+   * @param {number[]} [options.ports] TCP ports to expose via preview URLs (default: `[]`)
    * @param {object} [options.envs] environment variables to inject into the sandbox
    * @param {object} [options.policy] network policy (e.g. egress allowlist)
    * @returns {Promise<Sandbox>} connected sandbox instance
@@ -87,6 +91,7 @@ class Sandbox {
     if (options.region !== undefined) body.region = options.region
     if (options.envs !== undefined) body.envs = options.envs
     if (options.policy !== undefined) body.policy = options.policy
+    if (options.ports !== undefined) body.ports = options.ports
 
     const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox`
     const payload = await apiRequest('POST', url, creds.apiKey, body)
@@ -101,7 +106,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
-      publicUrlTemplate: payload.publicUrlTemplate || null,
+      previewUrls: parsePreviewUrls(payload.previewUrls),
       managementEndpoint: payload.managementEndpoint || null,
       namespace: creds.namespace,
       apiHost: creds.apiHost,
@@ -139,6 +144,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
+      previewUrls: parsePreviewUrls(payload.previewUrls),
       namespace: creds.namespace,
       apiHost: creds.apiHost,
       apiKey: creds.apiKey,
@@ -404,30 +410,29 @@ class Sandbox {
   /**
    * Returns the public preview URL for a given port on this sandbox.
    *
-   * @param {object} options URL options
-   * @param {number} options.port port number (1–65535)
-   * @param {string} [options.protocol] override the URL scheme (e.g. `'wss'`)
-   * @returns {Promise<string>} public preview URL
+   * This is a synchronous local lookup against the `previewUrls` map returned
+   * by the server at create time. The URL is opaque — do not parse or reconstruct it.
+   *
+   * @param {number} port port number (1–65535)
+   * @returns {string} public preview URL
+   * @throws {SandboxInvalidPortError} when `port` is not an integer in the
+   *   range 1–65535
+   * @throws {SandboxPortNotProvisionedError} when `port` is valid but was not
+   *   declared in `create({ ports })`
    */
-  async getUrl ({ port, protocol } = {}) {
-    if (!this.publicUrlTemplate) {
-      throw new SandboxClientError(
-        `Cannot get URL for sandbox '${this.id}': publicUrlTemplate is not available`
-      )
-    }
-
+  getUrl (port) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new SandboxClientError(
+      throw new SandboxInvalidPortError(
         `Invalid port '${port}': must be an integer between 1 and 65535`
       )
     }
 
-    let url = this.publicUrlTemplate
-      .replace('{sandboxId}', this.id)
-      .replace('{port}', String(port))
-
-    if (protocol) {
-      url = url.replace(/^https?:\/\//, `${protocol}://`)
+    const url = this.previewUrls.get(port)
+    if (url === undefined) {
+      throw new SandboxPortNotProvisionedError(
+        `Port ${port} was not provisioned for sandbox '${this.id}'. ` +
+        "Declare it in create({ ports: [...] }) to get a preview URL."
+      )
     }
 
     return url
@@ -462,6 +467,31 @@ class Sandbox {
   sendFrame (frame) {
     this.ws.send(frame)
   }
+}
+
+/**
+ * Parses the `previewUrls` JSON object returned by the server into a
+ * `Map<number, string>`. String keys (port numbers) are converted to integers.
+ * The URL values are treated as opaque — not parsed or reconstructed.
+ *
+ * Returns an empty Map when the server response omits `previewUrls` (fail-closed:
+ * every `getUrl()` call will throw `SandboxPortNotProvisionedError`).
+ *
+ * @param {object|null|undefined} raw the `previewUrls` field from the API response
+ * @returns {Map<number, string>}
+ */
+function parsePreviewUrls (raw) {
+  if (!raw || typeof raw !== 'object') {
+    return new Map()
+  }
+  const map = new Map()
+  for (const [key, value] of Object.entries(raw)) {
+    const port = Number(key)
+    if (Number.isInteger(port) && port >= 1 && port <= 65535 && typeof value === 'string') {
+      map.set(port, value)
+    }
+  }
+  return map
 }
 
 module.exports = Sandbox
