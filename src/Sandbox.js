@@ -34,7 +34,7 @@ class Sandbox {
    * @param {object} options sandbox options
    * @private
    */
-  constructor (options) {
+  constructor(options) {
     this.id = options.id
     this.endpoint = options.endpoint
     this.status = options.status
@@ -72,7 +72,7 @@ class Sandbox {
    * @param {object} [options.policy] network policy (e.g. egress allowlist)
    * @returns {Promise<Sandbox>} connected sandbox instance
    */
-  static async create (options = {}) {
+  static async create(options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
 
@@ -126,7 +126,7 @@ class Sandbox {
    * @param {string} [options.auth] Runtime API key
    * @returns {Promise<Sandbox>} sandbox instance with `status` populated (not WebSocket-connected)
    */
-  static async get (sandboxId, options = {}) {
+  static async get(sandboxId, options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
     const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox/${sandboxId}`
@@ -151,7 +151,7 @@ class Sandbox {
    *
    * @type {object}
    */
-  static get sizes () {
+  static get sizes() {
     return SANDBOX_SIZES
   }
 
@@ -161,7 +161,7 @@ class Sandbox {
    * @param {object} overrides credential overrides
    * @returns {{ apiHost: string, namespace: string, apiKey: string }}
    */
-  static resolveCredentials (overrides = {}) {
+  static resolveCredentials(overrides = {}) {
     return resolveCredentials(overrides)
   }
 
@@ -171,7 +171,7 @@ class Sandbox {
    * @param {string|object|undefined} size
    * @returns {string}
    */
-  static normalizeSize (size) {
+  static normalizeSize(size) {
     return normalizeSize(size)
   }
 
@@ -184,7 +184,7 @@ class Sandbox {
    *
    * @returns {Promise<void>}
    */
-  connect () {
+  connect() {
     if (!this.ws) {
       this.ws = new SandboxSocket({
         id: this.id,
@@ -202,62 +202,110 @@ class Sandbox {
   /**
    * Executes a command inside the sandbox.
    *
-   * Returns a Promise (with an `execId` property) that resolves to
-   * `{ execId, stdout, stderr, exitCode }` when the command completes.
+   * `options.timeout` is not supported with `options.detached: true`.
    *
    * @param {string} command command to run
    * @param {object} [options] execution options
-   * @param {number} [options.timeout] timeout in milliseconds
+   * @param {number} [options.timeout] timeout in milliseconds (foreground only)
+   * @param {boolean} [options.detached] when true, run as a detached background process
    * @param {string|Buffer} [options.stdin] data to send to stdin at startup
    * @param {function} [options.onOutput] callback called with `(data, stream)` for each output chunk
-   * @returns {Promise<{execId: string, stdout: string, stderr: string, exitCode: number}>}
+   * @returns {Promise}
    */
-  exec (command, options = {}) {
+  exec(command, options = {}) {
     try {
       this.ensureOpen()
     } catch (error) {
       return Promise.reject(error)
     }
 
-    const execId = `exec-${crypto.randomBytes(12).toString('hex')}`
-    let timeoutHandle
-
-    const execPromise = new Promise((resolve, reject) => {
-      this.ws.pendingExecs.set(execId, {
-        resolve,
-        reject,
-        stdout: '',
-        stderr: '',
-        onOutput: options.onOutput,
-        timeout: undefined
-      })
-
-      if (options.timeout) {
-        timeoutHandle = setTimeout(() => {
-          try { this.kill(execId) } catch (_) {}
-          this.ws.rejectExec(execId, new SandboxTimeoutError(
-            `Command '${command}' exceeded timeout of ${options.timeout}ms`
-          ))
-        }, options.timeout)
-        this.ws.pendingExecs.get(execId).timeout = timeoutHandle
-      }
-    })
-
-    execPromise.execId = execId
-
-    try {
-      this.sendFrame({ type: 'exec.run', execId, command })
-      if (options.stdin !== undefined) {
-        this.writeStdin(execId, options.stdin)
-        this.closeStdin(execId)
-      }
-    } catch (error) {
-      this.ws.rejectExec(execId, new SandboxWebSocketError(
-        `Could not send exec frame: ${error.message}`
+    if (options.detached && options.timeout) {
+      return Promise.reject(new SandboxClientError(
+        'cannot set a timeout for a detached command'
       ))
     }
 
-    return execPromise
+    const execId = `exec-${crypto.randomBytes(12).toString('hex')}`
+    const promise = this.sendExecFrameAndAwaitResponse(execId, command, options)
+    promise.execId = execId
+    return promise
+  }
+
+  /**
+   * @param {string} execId
+   * @param {string} command
+   * @param {object} options
+   * @private
+   */
+  async sendExecFrameAndAwaitResponse(execId, command, options) {
+    const detached = !!options.detached
+    const frame = { type: 'exec.run', execId, command, ...(detached && { detached: true }) }
+
+    const { ackPromise, waitPromise } = this.ws.sendExec(execId, frame, {
+      detached,
+      onOutput: options.onOutput
+    })
+
+    if (options.timeout) {
+      this.ws.setExecTimeout(execId, this.scheduleTimeout(execId, command, options.timeout))
+    }
+
+    if (options.stdin !== undefined) {
+      this.writeStdin(execId, options.stdin)
+      this.closeStdin(execId)
+    }
+
+    const result = await ackPromise
+
+    if (!detached) return result
+
+    const { pid, startedAt } = result
+    return {
+      execId,
+      pid,
+      startedAt,
+      detached: true,
+      wait: () => waitPromise,
+      writeStdin: (data) => this.writeStdin(execId, data),
+      closeStdin: () => this.closeStdin(execId),
+      kill: (signal) => this.kill(execId, signal)
+    }
+  }
+
+  /**
+   * Re-attaches to a detached command that is still running in the sandbox.
+   *
+   * @param {string} execId the execId returned by the original `exec()` call
+   * @param {object} [options] re-attach options
+   * @param {function} [options.onOutput] callback called with `(data, stream)` for live output
+   * @returns {Promise<{execId, command, pid, startedAt, detached, wait, kill, writeStdin, closeStdin}>}
+   */
+  getCommand(execId, options = {}) {
+    try {
+      this.ensureOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    const getPromise = new Promise((resolve, reject) => {
+      this.ws.pendingGetOps.set(execId, {
+        resolve,
+        reject,
+        onOutput: options.onOutput || null,
+        sandbox: this
+      })
+    })
+
+    try {
+      this.sendFrame({ type: 'exec.get', execId })
+    } catch (error) {
+      this.ws.pendingGetOps.delete(execId)
+      return Promise.reject(new SandboxWebSocketError(
+        `Could not send exec.get frame: ${error.message}`
+      ))
+    }
+
+    return getPromise
   }
 
   /**
@@ -266,7 +314,7 @@ class Sandbox {
    * @param {string} execId execution id
    * @param {string} [signal] signal to deliver (default: `'SIGTERM'`)
    */
-  kill (execId, signal = 'SIGTERM') {
+  kill(execId, signal = 'SIGTERM') {
     this.ensureOpen()
     this.sendFrame({ type: 'exec.kill', execId, signal })
   }
@@ -278,7 +326,7 @@ class Sandbox {
    * @param {string} execId execution id from `exec()`
    * @param {string|Buffer} data data to write
    */
-  writeStdin (execId, data) {
+  writeStdin(execId, data) {
     this.ensureOpen()
     const frame = { type: 'exec.input', execId }
     if (Buffer.isBuffer(data)) {
@@ -296,7 +344,7 @@ class Sandbox {
    *
    * @param {string} execId execution id from `exec()`
    */
-  closeStdin (execId) {
+  closeStdin(execId) {
     this.ensureOpen()
     this.sendFrame({ type: 'exec.endInput', execId })
   }
@@ -311,7 +359,7 @@ class Sandbox {
    * @param {string} path path inside the sandbox
    * @returns {Promise<string>} file contents as a UTF-8 string
    */
-  readFile (path) {
+  readFile(path) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -341,7 +389,7 @@ class Sandbox {
    * @param {string|Buffer} content file contents
    * @returns {Promise<{path: string, size: number, ok: boolean}>} write confirmation
    */
-  writeFile (path, content) {
+  writeFile(path, content) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -374,7 +422,7 @@ class Sandbox {
    * @param {string} path directory path inside the sandbox
    * @returns {Promise<Array<{name: string, type: string, size?: number}>>} directory entries
    */
-  listFiles (path) {
+  listFiles(path) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -409,8 +457,8 @@ class Sandbox {
    * @param {string} [options.protocol] override the URL scheme (e.g. `'wss'`)
    * @returns {Promise<string>} public preview URL
    */
-  async getUrl ({ port, protocol } = {}) {
-    if (!this.publicUrlTemplate) {
+  async getUrl({ port, protocol } = {}) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new SandboxClientError(
         `Cannot get URL for sandbox '${this.id}': publicUrlTemplate is not available`
       )
@@ -438,7 +486,7 @@ class Sandbox {
    *
    * @returns {Promise<object>} destroy response payload
    */
-  async destroy () {
+  async destroy() {
     const base = this.managementEndpoint || this.apiHost
     const url = `${base}/api/v1/namespaces/${this.namespace}/sandbox/${this.id}`
     const payload = await apiRequest('DELETE', url, this.apiKey)
@@ -452,14 +500,36 @@ class Sandbox {
   // Private helpers
   // ------------------------------------------------------------------
 
-  ensureOpen () {
+  /**
+   * Schedules a timeout that kills `execId` and rejects its pending entry.
+   *
+   * @param {string} execId
+   * @param {string} command human-readable command string (for the error message)
+   * @param {number} ms timeout in milliseconds
+   * @returns {ReturnType<setTimeout>} the timer handle (stored on the entry for cancellation)
+   */
+  scheduleTimeout(execId, command, ms) {
+    return setTimeout(() => {
+      try {
+        this.kill(execId)
+      } catch (_) {
+        // ignore errors
+      }
+      
+      this.ws.rejectExec(execId, new SandboxTimeoutError(
+        `Command '${command}' exceeded timeout of ${ms}ms`
+      ))
+    }, ms)
+  }
+
+  ensureOpen() {
     if (!this.ws) {
       throw new SandboxWebSocketError(`Sandbox '${this.id}' is not connected`)
     }
     this.ws.ensureOpen()
   }
 
-  sendFrame (frame) {
+  sendFrame(frame) {
     this.ws.send(frame)
   }
 }
