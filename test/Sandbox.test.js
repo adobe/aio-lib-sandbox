@@ -227,9 +227,9 @@ describe('Sandbox', () => {
 
       expect(sandbox.id).toBe('sb-new')
       expect(sandbox.status).toBe('ready')
-      expect(sandbox.previewUrls).toEqual({
-        3000: 'https://sb-new-3000.preview.example.net'
-      })
+      expect(sandbox.previewUrls).toEqual(new Map([
+        [3000, 'https://sb-new-3000.preview.example.net']
+      ]))
       expect(mockFetch).toHaveBeenCalledWith(
         'https://runtime.example.net/api/v1/namespaces/ns/sandbox',
         expect.objectContaining({ method: 'POST' })
