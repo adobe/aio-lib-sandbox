@@ -25,7 +25,7 @@ const {
  */
 class SandboxSocket {
   /**
-   * @param {object} options
+   * @param {object} options socket options
    * @param {string} options.id sandbox id
    * @param {string} options.endpoint WebSocket endpoint URL
    * @param {string} options.token authentication token
@@ -144,7 +144,7 @@ class SandboxSocket {
   /**
    * Serialises `frame` and sends it over the socket.
    *
-   * @param {object} frame
+   * @param {object} frame WebSocket frame to send
    */
   send (frame) {
     this.socket.send(JSON.stringify(frame))
@@ -167,7 +167,7 @@ class SandboxSocket {
   /**
    * Closes the underlying socket.
    *
-   * @param {object} [options]
+   * @param {object} [options] close options
    * @param {boolean} [options.intentional] whether pending work should be drained without error
    */
   close ({ intentional = false } = {}) {
@@ -180,22 +180,22 @@ class SandboxSocket {
   // ------------------------------------------------------------------
 
   /**
-   * Registers a pending exec, sends the frame, and returns the promises 
+   * Registers a pending exec, sends the frame, and returns the promises
    * that will be settled by subsequent result or ack frames (for detached)
    *
-   * @param {string} execId
+   * @param {string} execId execution id for the pending command
    * @param {object} frame the frame to send (must include `type` and `execId`)
-   * @param {{ detached: boolean, onOutput?: Function }} options
-   * @returns {{ ackPromise: Promise, waitPromise: Promise|null }}
+   * @param {{ detached: boolean, onOutput?: Function }} options pending exec options
+   * @returns {{ ackPromise: Promise, waitPromise: Promise|null }} promises for ack and optional completion
    */
   sendExec (execId, frame, { detached, onOutput }) {
     let waitResolve, waitReject, waitPromise
     if (detached) {
-      waitPromise = new Promise((res, rej) => { waitResolve = res; waitReject = rej })
+      waitPromise = new Promise((resolve, reject) => { waitResolve = resolve; waitReject = reject })
     }
 
     let resolve, reject
-    const ackPromise = new Promise((res, rej) => { resolve = res; reject = rej })
+    const ackPromise = new Promise((_resolve, _reject) => { resolve = _resolve; reject = _reject })
 
     this.pendingExecs.set(execId, {
       resolve,
@@ -225,8 +225,8 @@ class SandboxSocket {
   /**
    * Stores a timer handle on a pending exec entry so it can be cleared on completion.
    *
-   * @param {string} execId
-   * @param {ReturnType<setTimeout>} handle
+   * @param {string} execId execution id for the pending command
+   * @param {ReturnType<setTimeout>} handle timeout handle to store
    */
   setExecTimeout (execId, handle) {
     const entry = this.pendingExecs.get(execId)
@@ -236,8 +236,8 @@ class SandboxSocket {
   /**
    * Rejects and removes a pending exec, clearing its timeout.
    *
-   * @param {string} execId
-   * @param {Error} error
+   * @param {string} execId execution id for the pending command
+   * @param {Error} error error used to reject the command
    */
   rejectExec (execId, error) {
     const pending = this.pendingExecs.get(execId)
@@ -256,8 +256,8 @@ class SandboxSocket {
   /**
    * Rejects and removes a pending file operation.
    *
-   * @param {string} execId
-   * @param {Error} error
+   * @param {string} execId file operation id
+   * @param {Error} error error used to reject the file operation
    */
   rejectFileOp (execId, error) {
     const pending = this.pendingFileOps.get(execId)
@@ -269,7 +269,7 @@ class SandboxSocket {
   /**
    * Resolves and removes a pending exec during an intentional sandbox shutdown.
    *
-   * @param {string} execId
+   * @param {string} execId execution id for the pending command
    */
   resolveExecOnIntentionalClose (execId) {
     const pending = this.pendingExecs.get(execId)
@@ -469,7 +469,7 @@ class SandboxSocket {
   /**
    * Handles exec.info (response to exec.get) and error frames routed from handleMessage.
    *
-   * @param {object} frame
+   * @param {object} frame exec.get response or error frame
    */
   handleGetFrame (frame) {
     const pending = this.pendingGetOps.get(frame.execId)
@@ -517,12 +517,12 @@ class SandboxSocket {
    *
    * @param {object} frame exec.info frame
    * @param {object} pending entry from pendingGetOps
-   * @returns {Promise}
+   * @returns {Promise} wait promise for the running command
    */
   resolveExecEntry (frame, pending) {
     const existingExec = this.pendingExecs.get(frame.execId)
     if (existingExec) {
-      this.mergeOnOutputCallback(existingExec, pending.onOutput)
+      existingExec.onOutput = this.mergeOnOutputCallback(existingExec.onOutput, pending.onOutput)
       return existingExec._waitPromise
     }
     return this.registerReattachedExec(frame, pending.onOutput)
@@ -531,13 +531,13 @@ class SandboxSocket {
   /**
    * Appends `onOutput` to an existing exec entry's callback chain, preserving the previous handler.
    *
-   * @param {object} existingExec entry from pendingExecs
+   * @param {Function|null|undefined} prev existing callback
    * @param {Function|undefined} onOutput new callback to add
+   * @returns {Function|null|undefined} merged callback
    */
-  mergeOnOutputCallback (existingExec, onOutput) {
-    if (!onOutput) return
-    const prev = existingExec.onOutput
-    existingExec.onOutput = (data, stream) => {
+  mergeOnOutputCallback (prev, onOutput) {
+    if (!onOutput) return prev
+    return (data, stream) => {
       if (prev) prev(data, stream)
       onOutput(data, stream)
     }
@@ -549,11 +549,11 @@ class SandboxSocket {
    *
    * @param {object} frame exec.info frame
    * @param {Function|undefined} onOutput output callback
-   * @returns {Promise}
+   * @returns {Promise} wait promise for the reattached command
    */
   registerReattachedExec (frame, onOutput) {
     let waitResolve, waitReject
-    const waitPromise = new Promise((res, rej) => { waitResolve = res; waitReject = rej })
+    const waitPromise = new Promise((resolve, reject) => { waitResolve = resolve; waitReject = reject })
     this.pendingExecs.set(frame.execId, {
       resolve: () => {},
       reject: () => {},
@@ -576,7 +576,7 @@ class SandboxSocket {
    * @param {object} frame exec.info frame
    * @param {Promise} waitPromise resolves when the process exits
    * @param {object} sandbox Sandbox instance for delegating control operations
-   * @returns {object}
+   * @returns {object} command handle with wait and control helpers
    */
   buildCommandObject (frame, waitPromise, sandbox) {
     const { execId } = frame

@@ -1,0 +1,21 @@
+{
+  "extends": ["@adobe/eslint-config-aio-lib-config"],
+  "settings": {
+    "jsdoc": {
+      "ignorePrivate": true
+    }
+  },
+  "rules": {
+    "no-param-reassign": ["warn", { "props": true }],
+    "jsdoc/tag-lines": [
+      "error",
+      "never",
+      {
+        "startLines": null
+      }
+    ]
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020
+  }
+}
