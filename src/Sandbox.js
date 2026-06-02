@@ -36,7 +36,7 @@ class Sandbox {
    * @param {object} options sandbox options
    * @private
    */
-  constructor(options) {
+  constructor (options) {
     this.id = options.id
     this.endpoint = options.endpoint
     this.status = options.status
@@ -76,7 +76,7 @@ class Sandbox {
    * @param {object} [options.policy] network policy (e.g. egress allowlist)
    * @returns {Promise<Sandbox>} connected sandbox instance
    */
-  static async create(options = {}) {
+  static async create (options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
 
@@ -131,7 +131,7 @@ class Sandbox {
    * @param {string} [options.auth] Runtime API key
    * @returns {Promise<Sandbox>} sandbox instance with `status` populated (not WebSocket-connected)
    */
-  static async get(sandboxId, options = {}) {
+  static async get (sandboxId, options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
     const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox/${sandboxId}`
@@ -157,7 +157,7 @@ class Sandbox {
    *
    * @type {object}
    */
-  static get sizes() {
+  static get sizes () {
     return SANDBOX_SIZES
   }
 
@@ -165,19 +165,19 @@ class Sandbox {
    * Exposes `resolveCredentials` as a static helper (useful for testing).
    *
    * @param {object} overrides credential overrides
-   * @returns {{ apiHost: string, namespace: string, apiKey: string }}
+   * @returns {{ apiHost: string, namespace: string, apiKey: string }} resolved Runtime credentials
    */
-  static resolveCredentials(overrides = {}) {
+  static resolveCredentials (overrides = {}) {
     return resolveCredentials(overrides)
   }
 
   /**
    * Exposes `normalizeSize` as a static helper (useful for testing).
    *
-   * @param {string|object|undefined} size
-   * @returns {string}
+   * @param {string|object|undefined} size sandbox size name or resource spec
+   * @returns {string} normalized sandbox size name
    */
-  static normalizeSize(size) {
+  static normalizeSize (size) {
     return normalizeSize(size)
   }
 
@@ -190,7 +190,7 @@ class Sandbox {
    *
    * @returns {Promise<void>}
    */
-  connect() {
+  connect () {
     if (!this.ws) {
       this.ws = new SandboxSocket({
         id: this.id,
@@ -215,10 +215,10 @@ class Sandbox {
    * @param {number} [options.timeout] timeout in milliseconds (foreground only)
    * @param {boolean} [options.detached] when true, run as a detached background process
    * @param {string|Buffer} [options.stdin] data to send to stdin at startup
-   * @param {function} [options.onOutput] callback called with `(data, stream)` for each output chunk
-   * @returns {Promise}
+   * @param {Function} [options.onOutput] callback called with `(data, stream)` for each output chunk
+   * @returns {Promise} command result, or a detached command handle when `options.detached` is true
    */
-  exec(command, options = {}) {
+  exec (command, options = {}) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -238,12 +238,12 @@ class Sandbox {
   }
 
   /**
-   * @param {string} execId
+   * @param {string} execId execution id to run inside the sandbox
    * @param {string} command
    * @param {object} options
    * @private
    */
-  async sendExecFrameAndAwaitResponse(execId, command, options) {
+  async sendExecFrameAndAwaitResponse (execId, command, options) {
     const detached = !!options.detached
     const frame = { type: 'exec.run', execId, command, ...(detached && { detached: true }) }
 
@@ -283,10 +283,10 @@ class Sandbox {
    *
    * @param {string} execId the execId returned by the original `exec()` call
    * @param {object} [options] re-attach options
-   * @param {function} [options.onOutput] callback called with `(data, stream)` for live output
-   * @returns {Promise<{execId, command, pid, startedAt, detached, wait, kill, writeStdin, closeStdin}>}
+   * @param {Function} [options.onOutput] callback called with `(data, stream)` for live output
+   * @returns {Promise<{execId, command, pid, startedAt, detached, wait, kill, writeStdin, closeStdin}>} command handle
    */
-  getCommand(execId, options = {}) {
+  getCommand (execId, options = {}) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -320,7 +320,7 @@ class Sandbox {
    * @param {string} execId execution id
    * @param {string} [signal] signal to deliver (default: `'SIGTERM'`)
    */
-  kill(execId, signal = 'SIGTERM') {
+  kill (execId, signal = 'SIGTERM') {
     this.ensureOpen()
     this.sendFrame({ type: 'exec.kill', execId, signal })
   }
@@ -332,7 +332,7 @@ class Sandbox {
    * @param {string} execId execution id from `exec()`
    * @param {string|Buffer} data data to write
    */
-  writeStdin(execId, data) {
+  writeStdin (execId, data) {
     this.ensureOpen()
     const frame = { type: 'exec.input', execId }
     if (Buffer.isBuffer(data)) {
@@ -350,7 +350,7 @@ class Sandbox {
    *
    * @param {string} execId execution id from `exec()`
    */
-  closeStdin(execId) {
+  closeStdin (execId) {
     this.ensureOpen()
     this.sendFrame({ type: 'exec.endInput', execId })
   }
@@ -365,7 +365,7 @@ class Sandbox {
    * @param {string} path path inside the sandbox
    * @returns {Promise<string>} file contents as a UTF-8 string
    */
-  readFile(path) {
+  readFile (path) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -395,7 +395,7 @@ class Sandbox {
    * @param {string|Buffer} content file contents
    * @returns {Promise<{path: string, size: number, ok: boolean}>} write confirmation
    */
-  writeFile(path, content) {
+  writeFile (path, content) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -428,7 +428,7 @@ class Sandbox {
    * @param {string} path directory path inside the sandbox
    * @returns {Promise<Array<{name: string, type: string, size?: number}>>} directory entries
    */
-  listFiles(path) {
+  listFiles (path) {
     try {
       this.ensureOpen()
     } catch (error) {
@@ -479,7 +479,7 @@ class Sandbox {
     if (url === undefined) {
       throw new SandboxPortNotProvisionedError(
         `Port ${port} was not provisioned for sandbox '${this.id}'. ` +
-        "Declare it in create({ ports: [...] }) to get a preview URL."
+        'Declare it in create({ ports: [...] }) to get a preview URL.'
       )
     }
 
@@ -491,7 +491,7 @@ class Sandbox {
    *
    * @returns {Promise<object>} destroy response payload
    */
-  async destroy() {
+  async destroy () {
     const base = this.managementEndpoint || this.apiHost
     const url = `${base}/api/v1/namespaces/${this.namespace}/sandbox/${this.id}`
     this.ws?.beginIntentionalClose()
@@ -516,33 +516,33 @@ class Sandbox {
   /**
    * Schedules a timeout that kills `execId` and rejects its pending entry.
    *
-   * @param {string} execId
+   * @param {string} execId exec identifier to reject when the timeout fires
    * @param {string} command human-readable command string (for the error message)
    * @param {number} ms timeout in milliseconds
    * @returns {ReturnType<setTimeout>} the timer handle (stored on the entry for cancellation)
    */
-  scheduleTimeout(execId, command, ms) {
+  scheduleTimeout (execId, command, ms) {
     return setTimeout(() => {
       try {
         this.kill(execId)
       } catch (_) {
         // ignore errors
       }
-      
+
       this.ws.rejectExec(execId, new SandboxTimeoutError(
         `Command '${command}' exceeded timeout of ${ms}ms`
       ))
     }, ms)
   }
 
-  ensureOpen() {
+  ensureOpen () {
     if (!this.ws) {
       throw new SandboxWebSocketError(`Sandbox '${this.id}' is not connected`)
     }
     this.ws.ensureOpen()
   }
 
-  sendFrame(frame) {
+  sendFrame (frame) {
     this.ws.send(frame)
   }
 }
@@ -556,7 +556,7 @@ class Sandbox {
  * every `getUrl()` call will throw `SandboxPortNotProvisionedError`).
  *
  * @param {object|null|undefined} raw the `previewUrls` field from the API response
- * @returns {Map<number, string>}
+ * @returns {Map<number, string>} preview URLs keyed by port number
  */
 function parsePreviewUrls (raw) {
   if (!raw || typeof raw !== 'object') {

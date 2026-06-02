@@ -80,6 +80,9 @@ const BASE_OPTIONS = {
 
 let sockets
 
+/**
+ *
+ */
 function setupWebSocket () {
   sockets = []
   WebSocket.OPEN = 1
@@ -90,6 +93,12 @@ function setupWebSocket () {
   })
 }
 
+/**
+ * Builds a connected sandbox backed by the fake WebSocket.
+ *
+ * @param {object} opts sandbox option overrides
+ * @returns {Promise<Sandbox>} connected sandbox instance
+ */
 async function buildConnectedSandbox (opts = {}) {
   const sandbox = new Sandbox({ ...BASE_OPTIONS, ...opts })
   const connectPromise = sandbox.connect()
@@ -355,7 +364,7 @@ describe('Sandbox', () => {
       await new Promise(resolve => setImmediate(resolve))
       sockets[0].open()
       sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-noep' })
-      const sandbox = await createPromise
+      await createPromise
 
       expect(sockets[0].url).toContain('wss://')
       expect(sockets[0].url).toContain('sb-noep')

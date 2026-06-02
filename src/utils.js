@@ -18,10 +18,23 @@ const {
 } = require('./errors')
 const { SANDBOX_SIZES } = require('./constants')
 
+/**
+ * Builds a Basic authorization header from a Runtime API key.
+ *
+ * @param {string} apiKey Runtime API key
+ * @returns {string} Basic authorization header value
+ */
 function buildAuthorizationHeader (apiKey) {
   return `Basic ${Buffer.from(apiKey).toString('base64')}`
 }
 
+/**
+ * Maps sandbox management API status codes to SDK error classes.
+ *
+ * @param {number} status HTTP response status
+ * @param {string} message error message
+ * @returns {SandboxClientError} SDK error matching the response status
+ */
 function createSandboxHttpError (status, message) {
   if (status === 401 || status === 403) {
     return new SandboxUnauthorizedError(message)
@@ -35,6 +48,12 @@ function createSandboxHttpError (status, message) {
   return new SandboxClientError(message)
 }
 
+/**
+ * Ensures the Runtime API host has a URL scheme.
+ *
+ * @param {string} host Runtime API host
+ * @returns {string} API host with a URL scheme
+ */
 function normalizeApiHost (host) {
   if (!host.match(/^https?:\/\//)) {
     return `https://${host}`
@@ -42,6 +61,14 @@ function normalizeApiHost (host) {
   return host
 }
 
+/**
+ * Builds the sandbox execution WebSocket endpoint from Runtime API details.
+ *
+ * @param {string} apiHost Runtime API host
+ * @param {string} namespace Runtime namespace
+ * @param {string} sandboxId sandbox id
+ * @returns {string} sandbox WebSocket endpoint
+ */
 function buildWebSocketEndpoint (apiHost, namespace, sandboxId) {
   const url = new URL(apiHost)
   url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
@@ -55,7 +82,7 @@ function buildWebSocketEndpoint (apiHost, namespace, sandboxId) {
  * explicit overrides. Throws `SandboxInitializationError` for missing values.
  *
  * @param {object} overrides explicit credential overrides
- * @returns {{ apiHost: string, namespace: string, apiKey: string }}
+ * @returns {{ apiHost: string, namespace: string, apiKey: string }} resolved Runtime credentials
  */
 function resolveCredentials (overrides = {}) {
   const apiHost = overrides.apiHost || process.env.__OW_API_HOST

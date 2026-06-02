@@ -218,3 +218,24 @@ const sandbox = await Sandbox.create({
   }
 })
 ```
+
+## Development
+
+Install development dependencies:
+
+```bash
+npm install
+```
+
+To run the same checks used by CI:
+
+```bash
+npm test
+```
+
+Linting is powered by ESLint:
+
+```bash
+npm run lint
+npm run lint-fix
+```
