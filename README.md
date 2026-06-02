@@ -97,6 +97,31 @@ console.log('exit code:', result.exitCode)
 
 > Note: Commands run in the `/workspace` directory by default, this is not configurable
 
+### Detached Commands
+
+Pass `detached: true` to run a long-lived background process.
+
+```js
+// Start a background server
+const command = await sandbox.exec('node server.js', { detached: true })
+
+// Wait for it to exit (e.g. after you stop it)
+const result = await command.wait()
+console.log('exit code:', result.exitCode)
+
+// Send a signal to stop it
+await command.kill()
+```
+
+If the process is still running and you need a handle to it from a different context, use `getCommand()` to re-attach by `execId`:
+
+```js
+const command = await sandbox.getCommand(execId, { onOutput: (data, stream) => process.stdout.write(data) })
+await command.wait()
+```
+
+> Note: Only 5 background processes are allowed to run at once currently.
+
 ### File Management
 
 ```js
