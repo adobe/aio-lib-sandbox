@@ -45,7 +45,7 @@ function normalizeApiHost (host) {
 function buildWebSocketEndpoint (apiHost, namespace, sandboxId) {
   const url = new URL(apiHost)
   url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
-  url.pathname = `/ws/v1/namespaces/${namespace}/sandboxes/${sandboxId}/exec`
+  url.pathname = `/api/v1/namespaces/${namespace}/sandboxes/${sandboxId}/exec`
   url.search = ''
   return url.toString()
 }
