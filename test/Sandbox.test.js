@@ -408,6 +408,38 @@ describe('Sandbox', () => {
         Sandbox.get('sb-x', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'bad' })
       ).rejects.toThrow(SandboxUnauthorizedError)
     })
+
+    test('throws SandboxTimeoutError on 504', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 504,
+        text: () => Promise.resolve('gateway timeout')
+      })
+
+      await expect(
+        Sandbox.get('sb-slow', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxTimeoutError)
+    })
+
+    test('throws SandboxClientError on unexpected API status', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('server error')
+      })
+
+      await expect(
+        Sandbox.get('sb-error', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxClientError)
+    })
+
+    test('wraps fetch failures in SandboxClientError', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network unavailable'))
+
+      await expect(
+        Sandbox.get('sb-network', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxClientError)
+    })
   })
 
   // -------------------------------------------------------------------------
