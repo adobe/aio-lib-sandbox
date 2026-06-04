@@ -67,7 +67,7 @@ class FakeWebSocket extends EventEmitter {
 
 const BASE_OPTIONS = {
   id: 'sb-test',
-  endpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-test/exec',
+  endpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-test/exec',
   status: 'ready',
   namespace: 'ns',
   apiHost: 'https://runtime.example.net',
@@ -209,7 +209,7 @@ describe('Sandbox', () => {
         ok: true,
         json: () => Promise.resolve({
           sandboxId: 'sb-new',
-          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-new/exec',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-new/exec',
           status: 'ready',
           token: 'tok-new',
           maxLifetime: 3600,
@@ -240,7 +240,7 @@ describe('Sandbox', () => {
         [3000, 'https://sb-new-3000.preview.example.net']
       ]))
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://runtime.example.net/api/v1/namespaces/ns/sandbox',
+        'https://runtime.example.net/api/v1/namespaces/ns/sandboxes',
         expect.objectContaining({ method: 'POST' })
       )
     })
@@ -250,7 +250,7 @@ describe('Sandbox', () => {
         ok: true,
         json: () => Promise.resolve({
           sandboxId: 'sb-pol',
-          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-pol/exec',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-pol/exec',
           status: 'ready',
           token: 'tok-pol',
           maxLifetime: 3600
@@ -281,7 +281,7 @@ describe('Sandbox', () => {
         ok: true,
         json: () => Promise.resolve({
           sandboxId: 'sb-ports',
-          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-ports/exec',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-ports/exec',
           status: 'ready',
           token: 'tok-ports',
           maxLifetime: 3600,
@@ -321,7 +321,7 @@ describe('Sandbox', () => {
         ok: true,
         json: () => Promise.resolve({
           sandboxId: 'sb-env',
-          wsEndpoint: 'wss://runtime.example.net/ws/v1/namespaces/ns/sandbox/sb-env/exec',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-env/exec',
           status: 'ready',
           token: 'tok-env',
           maxLifetime: 3600
@@ -416,6 +416,38 @@ describe('Sandbox', () => {
       await expect(
         Sandbox.get('sb-x', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'bad' })
       ).rejects.toThrow(SandboxUnauthorizedError)
+    })
+
+    test('throws SandboxTimeoutError on 504', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 504,
+        text: () => Promise.resolve('gateway timeout')
+      })
+
+      await expect(
+        Sandbox.get('sb-slow', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxTimeoutError)
+    })
+
+    test('throws SandboxClientError on unexpected API status', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('server error')
+      })
+
+      await expect(
+        Sandbox.get('sb-error', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxClientError)
+    })
+
+    test('wraps fetch failures in SandboxClientError', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('network unavailable'))
+
+      await expect(
+        Sandbox.get('sb-network', { apiHost: 'https://runtime.example.net', namespace: 'ns', auth: 'key' })
+      ).rejects.toThrow(SandboxClientError)
     })
   })
 
@@ -853,7 +885,7 @@ describe('Sandbox', () => {
       expect(result.status).toBe('destroyed')
       expect(sandbox.status).toBe('destroyed')
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/sandbox/sb-test'),
+        expect.stringContaining('/sandboxes/sb-test'),
         expect.objectContaining({ method: 'DELETE' })
       )
     })

@@ -93,7 +93,7 @@ class Sandbox {
     if (options.policy !== undefined) body.policy = options.policy
     if (options.ports !== undefined) body.ports = options.ports
 
-    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox`
+    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes`
     const payload = await apiRequest('POST', url, creds.apiKey, body)
 
     const sandboxId = payload.sandboxId
@@ -134,7 +134,7 @@ class Sandbox {
   static async get (sandboxId, options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
-    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandbox/${sandboxId}`
+    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes/${sandboxId}`
     const payload = await apiRequest('GET', url, creds.apiKey)
 
     return new Sandbox({
@@ -493,7 +493,7 @@ class Sandbox {
    */
   async destroy () {
     const base = this.managementEndpoint || this.apiHost
-    const url = `${base}/api/v1/namespaces/${this.namespace}/sandbox/${this.id}`
+    const url = `${base}/api/v1/namespaces/${this.namespace}/sandboxes/${this.id}`
     this.ws?.beginIntentionalClose()
 
     let payload
