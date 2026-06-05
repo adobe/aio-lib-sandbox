@@ -75,7 +75,7 @@ const sandbox = await Sandbox.create({
   name:        'my-sandbox',
   type:        'cpu:default',
   maxLifetime: 3600,      // hard deadline from creation (seconds); default 3600, max 10800
-  idleTimeout: 900,       // inactivity deadline (seconds); default cluster value (~900), max 10800
+  idleTimeout: 900,       // inactivity deadline (seconds); default 900, max 10800
   ports:       [3000, 8080],
   envs:        { API_KEY: 'your-api-key' }
 })
@@ -89,7 +89,7 @@ A sandbox is deleted at whichever fires first:
 - **`t_last_active + idleTimeout`** — resets on every WebSocket message (`exec`, `stdin`, `signal`, `resize`) or status-check request; fires when the sandbox has been idle for `idleTimeout` seconds.
 
 To keep a sandbox alive until `maxLifetime`, send at least one message every `idleTimeout` seconds.
-Both values are in **seconds** and capped at **10800 (3 h)**. When `idleTimeout` is omitted, the backend applies its cluster-wide default.
+Both values are in **seconds**, default to **3600** (`maxLifetime`) and **900** (`idleTimeout`), and are capped at **10800 (3 h)**.
 
 ### Get Status
 
