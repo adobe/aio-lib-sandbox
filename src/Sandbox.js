@@ -43,6 +43,7 @@ class Sandbox {
     this.cluster = options.cluster
     this.region = options.region
     this.maxLifetime = options.maxLifetime
+    this.idleTimeout = options.idleTimeout
 
     this.namespace = options.namespace
     this.apiHost = options.apiHost
@@ -70,7 +71,11 @@ class Sandbox {
    * @param {string} [options.name] sandbox display name
    * @param {string} [options.type] sandbox type (default: `'cpu:default'`)
    * @param {string|object} [options.size] sandbox size tier (name or spec object)
-   * @param {number} [options.maxLifetime] maximum lifetime in seconds
+   * @param {number} [options.maxLifetime] maximum lifetime in seconds (default: 3600, max: 10800)
+   * @param {number} [options.idleTimeout] seconds of inactivity before the sandbox is terminated.
+   *   Inherits the cluster-configured idle timeout when omitted (currently 900 s). Max 10800 (3 h).
+   *   The idle timer resets on every WebSocket message or status-check request. The sandbox is
+   *   deleted at whichever fires first: `t_created + maxLifetime` or `t_last_active + idleTimeout`.
    * @param {number[]} [options.ports] TCP ports to expose via preview URLs (default: `[]`)
    * @param {object} [options.envs] environment variables to inject into the sandbox
    * @param {object} [options.policy] network policy (e.g. egress allowlist)
@@ -92,6 +97,7 @@ class Sandbox {
     if (options.envs !== undefined) body.envs = options.envs
     if (options.policy !== undefined) body.policy = options.policy
     if (options.ports !== undefined) body.ports = options.ports
+    if (options.idleTimeout !== undefined) body.idleTimeout = options.idleTimeout
 
     const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes`
     const payload = await apiRequest('POST', url, creds.apiKey, body)
@@ -106,6 +112,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
+      idleTimeout: payload.idleTimeout,
       previewUrls: parsePreviewUrls(payload.previewUrls),
       managementEndpoint: payload.managementEndpoint || null,
       namespace: creds.namespace,
@@ -144,6 +151,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
+      idleTimeout: payload.idleTimeout,
       previewUrls: parsePreviewUrls(payload.previewUrls),
       namespace: creds.namespace,
       apiHost: creds.apiHost,
