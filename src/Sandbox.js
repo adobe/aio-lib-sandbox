@@ -130,10 +130,8 @@ class Sandbox {
    * Credentials are read from the environment automatically.
    * Any value passed explicitly in `options` overrides the environment.
    *
-   * On production clusters the FaaSt SandboxHostname middleware routes status and
-   * management requests through a per-sandbox HMAC-validated hostname. Pass
-   * `options.managementEndpoint` (returned by `Sandbox.create()`) so the request
-   * is sent to the correct host. Falls back to `options.apiHost` when omitted.
+   * Pass the management endpoint so the request is sent to the correct host;
+   * falls back to `options.apiHost` when omitted.
    *
    * @param {string} sandboxId the sandbox ID to look up
    * @param {object} [options] credential overrides
