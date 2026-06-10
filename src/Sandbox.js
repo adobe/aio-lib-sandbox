@@ -139,7 +139,7 @@ class Sandbox {
    * @param {string} [options.namespace] Runtime namespace
    * @param {string} [options.auth] Runtime API key
    * @param {string} [options.managementEndpoint] per-sandbox management endpoint returned by
-   *   `Sandbox.create()`. Required on production clusters; falls back to `apiHost` otherwise.
+   *   `Sandbox.create()`. Falls back to `apiHost` otherwise.
    * @returns {Promise<Sandbox>} sandbox instance with `status` populated (not WebSocket-connected)
    */
   static async get (sandboxId, options = {}) {
