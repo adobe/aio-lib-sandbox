@@ -13,6 +13,7 @@ const WebSocket = require('ws')
 const {
   SandboxClientError,
   SandboxCommandNotFoundError,
+  ProtocolVersionMismatchError,
   SandboxUnauthorizedError,
   SandboxWebSocketError
 } = require('./errors')
@@ -353,6 +354,11 @@ class SandboxSocket {
     if (code === 4001) {
       return new SandboxUnauthorizedError(
         `Sandbox '${this.id}' rejected the WebSocket authentication token`
+      )
+    }
+    if (code === 4003) {
+      return new ProtocolVersionMismatchError(
+        `Sandbox '${this.id}' WebSocket protocol version does not match this SDK`
       )
     }
     return new SandboxWebSocketError(

@@ -16,7 +16,7 @@ const {
   SandboxUnauthorizedError,
   SandboxTimeoutError
 } = require('./errors')
-const { SANDBOX_SIZES } = require('./constants')
+const { SANDBOX_SIZES, API_PREFIX } = require('./constants')
 
 /**
  * Builds a Basic authorization header from a Runtime API key.
@@ -72,7 +72,7 @@ function normalizeApiHost (host) {
 function buildWebSocketEndpoint (apiHost, namespace, sandboxId) {
   const url = new URL(apiHost)
   url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
-  url.pathname = `/api/v1/namespaces/${namespace}/sandboxes/${sandboxId}/exec`
+  url.pathname = `${API_PREFIX}/namespaces/${namespace}/sandboxes/${sandboxId}/exec`
   url.search = ''
   return url.toString()
 }

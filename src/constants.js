@@ -16,4 +16,7 @@ const SANDBOX_SIZES = Object.freeze({
   XLARGE: { cpu: '8000m', memory: '32Gi', gpu: 1 }
 })
 
-module.exports = { SANDBOX_SIZES }
+const PROTOCOL_VERSION = '1'
+const API_PREFIX = `/api/v${PROTOCOL_VERSION}`
+
+module.exports = { SANDBOX_SIZES, PROTOCOL_VERSION, API_PREFIX }

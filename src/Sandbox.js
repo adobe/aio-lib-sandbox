@@ -23,7 +23,7 @@ const {
   normalizeSize,
   apiRequest
 } = require('./utils')
-const { SANDBOX_SIZES } = require('./constants')
+const { SANDBOX_SIZES, PROTOCOL_VERSION, API_PREFIX } = require('./constants')
 const { SandboxSocket } = require('./ws')
 
 /**
@@ -43,6 +43,7 @@ class Sandbox {
     this.cluster = options.cluster
     this.region = options.region
     this.maxLifetime = options.maxLifetime
+    this.protocolVersion = options.protocolVersion || PROTOCOL_VERSION
 
     this.namespace = options.namespace
     this.apiHost = options.apiHost
@@ -93,7 +94,7 @@ class Sandbox {
     if (options.policy !== undefined) body.policy = options.policy
     if (options.ports !== undefined) body.ports = options.ports
 
-    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes`
+    const url = `${creds.apiHost}${API_PREFIX}/namespaces/${creds.namespace}/sandboxes`
     const payload = await apiRequest('POST', url, creds.apiKey, body)
 
     const sandboxId = payload.sandboxId
@@ -106,6 +107,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
+      protocolVersion: payload.protocolVersion || PROTOCOL_VERSION,
       previewUrls: parsePreviewUrls(payload.previewUrls),
       managementEndpoint: payload.managementEndpoint || null,
       namespace: creds.namespace,
@@ -134,7 +136,7 @@ class Sandbox {
   static async get (sandboxId, options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
-    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes/${sandboxId}`
+    const url = `${creds.apiHost}${API_PREFIX}/namespaces/${creds.namespace}/sandboxes/${sandboxId}`
     const payload = await apiRequest('GET', url, creds.apiKey)
 
     return new Sandbox({
@@ -144,6 +146,7 @@ class Sandbox {
       cluster: payload.cluster,
       region: payload.region,
       maxLifetime: payload.maxLifetime,
+      protocolVersion: payload.protocolVersion || PROTOCOL_VERSION,
       previewUrls: parsePreviewUrls(payload.previewUrls),
       namespace: creds.namespace,
       apiHost: creds.apiHost,
@@ -159,6 +162,15 @@ class Sandbox {
    */
   static get sizes () {
     return SANDBOX_SIZES
+  }
+
+  /**
+   * Sandbox wire protocol major bundled with this SDK.
+   *
+   * @type {string}
+   */
+  static get protocolVersion () {
+    return PROTOCOL_VERSION
   }
 
   /**
@@ -493,7 +505,7 @@ class Sandbox {
    */
   async destroy () {
     const base = this.managementEndpoint || this.apiHost
-    const url = `${base}/api/v1/namespaces/${this.namespace}/sandboxes/${this.id}`
+    const url = `${base}${API_PREFIX}/namespaces/${this.namespace}/sandboxes/${this.id}`
     this.ws?.beginIntentionalClose()
 
     let payload
