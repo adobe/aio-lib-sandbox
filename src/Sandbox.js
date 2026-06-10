@@ -73,8 +73,7 @@ class Sandbox {
    * @param {string|object} [options.size] sandbox size tier (name or spec object)
    * @param {number} [options.idleTimeout] seconds of inactivity before the sandbox is terminated
    *   (default: 900, max: 10800). The idle timer resets on every WebSocket message or status-check
-   *   request. The sandbox is deleted at whichever fires first: `t_created + maxLifetime` or
-   *   `t_last_active + idleTimeout`.
+   *   request.
    * @param {number} [options.maxLifetime] maximum lifetime in seconds (default: 3600, max: 10800)
    * @param {number[]} [options.ports] TCP ports to expose via preview URLs (default: `[]`)
    * @param {object} [options.envs] environment variables to inject into the sandbox
