@@ -131,17 +131,25 @@ class Sandbox {
    * Credentials are read from the environment automatically.
    * Any value passed explicitly in `options` overrides the environment.
    *
+   * On production clusters the FaaSt SandboxHostname middleware routes status and
+   * management requests through a per-sandbox HMAC-validated hostname. Pass
+   * `options.managementEndpoint` (returned by `Sandbox.create()`) so the request
+   * is sent to the correct host. Falls back to `options.apiHost` when omitted.
+   *
    * @param {string} sandboxId the sandbox ID to look up
    * @param {object} [options] credential overrides
    * @param {string} [options.apiHost] Runtime API host
    * @param {string} [options.namespace] Runtime namespace
    * @param {string} [options.auth] Runtime API key
+   * @param {string} [options.managementEndpoint] per-sandbox management endpoint returned by
+   *   `Sandbox.create()`. Required on production clusters; falls back to `apiHost` otherwise.
    * @returns {Promise<Sandbox>} sandbox instance with `status` populated (not WebSocket-connected)
    */
   static async get (sandboxId, options = {}) {
     console.warn('[aio-lib-sandbox] alpha — APIs may change without notice')
     const creds = resolveCredentials(options)
-    const url = `${creds.apiHost}/api/v1/namespaces/${creds.namespace}/sandboxes/${sandboxId}`
+    const base = options.managementEndpoint || creds.apiHost
+    const url = `${base}/api/v1/namespaces/${creds.namespace}/sandboxes/${sandboxId}`
     const payload = await apiRequest('GET', url, creds.apiKey)
 
     return new Sandbox({
@@ -152,6 +160,7 @@ class Sandbox {
       region: payload.region,
       idleTimeout: payload.idleTimeout,
       maxLifetime: payload.maxLifetime,
+      managementEndpoint: payload.managementEndpoint || options.managementEndpoint || null,
       previewUrls: parsePreviewUrls(payload.previewUrls),
       namespace: creds.namespace,
       apiHost: creds.apiHost,
