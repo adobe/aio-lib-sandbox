@@ -74,8 +74,8 @@ const { Sandbox } = require('@adobe/aio-lib-sandbox')
 const sandbox = await Sandbox.create({
   name:        'my-sandbox',
   type:        'cpu:default',
-  idleTimeout: 900,       // inactivity deadline (seconds); default 900, max 10800
-  maxLifetime: 3600,      // hard deadline from creation (seconds); default 3600, max 10800
+  idleTimeout: 900,
+  maxLifetime: 3600,
   ports:       [3000, 8080],
   envs:        { API_KEY: 'your-api-key' }
 })
