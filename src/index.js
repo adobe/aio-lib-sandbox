@@ -22,7 +22,8 @@ const {
   SandboxCommandNotFoundError,
   SandboxPortNotProvisionedError,
   SandboxInvalidPortError,
-  ProtocolVersionMismatchError
+  ProtocolVersionMismatchError,
+  SandboxMalformedFrameError
 } = require('./errors')
 
 module.exports = {
@@ -38,5 +39,6 @@ module.exports = {
   SandboxCommandNotFoundError,
   SandboxPortNotProvisionedError,
   SandboxInvalidPortError,
-  ProtocolVersionMismatchError
+  ProtocolVersionMismatchError,
+  SandboxMalformedFrameError
 }

@@ -22,7 +22,8 @@ const {
   SandboxInvalidPortError,
   SandboxTimeoutError,
   SandboxUnauthorizedError,
-  SandboxWebSocketError
+  SandboxWebSocketError,
+  SandboxMalformedFrameError
 } = require('../src/errors')
 
 jest.mock('ws')
@@ -507,6 +508,14 @@ describe('Sandbox', () => {
       sockets[0].open()
       sockets[0].closeWith(4003)
       await expect(p).rejects.toThrow(ProtocolVersionMismatchError)
+    })
+
+    test('rejects on malformed frame close code 4004 with SandboxMalformedFrameError', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      const p = sandbox.connect()
+      sockets[0].open()
+      sockets[0].closeWith(4004)
+      await expect(p).rejects.toThrow(SandboxMalformedFrameError)
     })
 
     test('rejects on unexpected socket close', async () => {
