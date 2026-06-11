@@ -74,11 +74,18 @@ const { Sandbox } = require('@adobe/aio-lib-sandbox')
 const sandbox = await Sandbox.create({
   name:        'my-sandbox',
   type:        'cpu:default',
+  idleTimeout: 900,
   maxLifetime: 3600,
   ports:       [3000, 8080],
   envs:        { API_KEY: 'your-api-key' }
 })
 ```
+
+#### Sandbox lifetime model
+
+A sandbox is always deleted when `maxLifetime` has elapsed. It will also be deleted after the `idleTimeout` has elapsed, if there has been no activity.
+
+To keep a sandbox alive, send at least one command or check the status every `idleTimeout` seconds.
 
 ### Get Status
 

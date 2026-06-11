@@ -352,6 +352,98 @@ describe('Sandbox', () => {
       await expect(Sandbox.create({ name: 'no-creds' })).rejects.toThrow(SandboxInitializationError)
     })
 
+    test('sends default idleTimeout 900 and maxLifetime 3600 when not specified', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-defaults',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-defaults/exec',
+          status: 'ready',
+          token: 'tok-defaults',
+          idleTimeout: 900,
+          maxLifetime: 3600
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        name: 'defaults-sandbox',
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key'
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-defaults' })
+      await createPromise
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.idleTimeout).toBe(900)
+      expect(body.maxLifetime).toBe(3600)
+    })
+
+    test('forwards explicit idleTimeout in the request body', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-idle',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-idle/exec',
+          status: 'ready',
+          token: 'tok-idle',
+          idleTimeout: 1800,
+          maxLifetime: 3600
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        name: 'idle-sandbox',
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key',
+        idleTimeout: 1800
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-idle' })
+      await createPromise
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.idleTimeout).toBe(1800)
+    })
+
+    test('stores idleTimeout from the create response on the instance', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-store',
+          wsEndpoint: 'wss://runtime.example.net/api/v1/namespaces/ns/sandboxes/sb-store/exec',
+          status: 'ready',
+          token: 'tok-store',
+          idleTimeout: 1800,
+          maxLifetime: 3600
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        name: 'store-sandbox',
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key',
+        idleTimeout: 1800
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-store' })
+      const sandbox = await createPromise
+
+      expect(sandbox.idleTimeout).toBe(1800)
+    })
+
     test('falls back to buildWebSocketEndpoint when wsEndpoint absent', async () => {
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -404,6 +496,26 @@ describe('Sandbox', () => {
       expect(sandbox.status).toBe('running')
       expect(sandbox.cluster).toBe('cluster-b')
       expect(sandbox.protocolVersion).toBe('1')
+    })
+
+    test('stores idleTimeout from the get response on the instance', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-get-idle',
+          status: 'running',
+          idleTimeout: 1200,
+          maxLifetime: 3600
+        })
+      })
+
+      const sandbox = await Sandbox.get('sb-get-idle', {
+        apiHost: 'https://runtime.example.net',
+        namespace: 'ns',
+        auth: 'uuid:key'
+      })
+
+      expect(sandbox.idleTimeout).toBe(1200)
     })
 
     test('throws SandboxNotFoundError on 404', async () => {
