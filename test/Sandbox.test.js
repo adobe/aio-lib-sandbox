@@ -17,11 +17,13 @@ const {
   SandboxCommandNotFoundError,
   SandboxInitializationError,
   SandboxNotFoundError,
+  ProtocolVersionMismatchError,
   SandboxPortNotProvisionedError,
   SandboxInvalidPortError,
   SandboxTimeoutError,
   SandboxUnauthorizedError,
-  SandboxWebSocketError
+  SandboxWebSocketError,
+  SandboxMalformedFrameError
 } = require('../src/errors')
 
 jest.mock('ws')
@@ -199,6 +201,12 @@ describe('Sandbox', () => {
     })
   })
 
+  describe('protocolVersion', () => {
+    test('exposes the bundled sandbox protocol major', () => {
+      expect(Sandbox.protocolVersion).toBe('1')
+    })
+  })
+
   // -------------------------------------------------------------------------
   // Static factories
   // -------------------------------------------------------------------------
@@ -213,6 +221,7 @@ describe('Sandbox', () => {
           status: 'ready',
           token: 'tok-new',
           maxLifetime: 3600,
+          protocolVersion: '1',
           previewUrls: {
             3000: 'https://sb-new-3000.preview.example.net'
           }
@@ -236,6 +245,7 @@ describe('Sandbox', () => {
 
       expect(sandbox.id).toBe('sb-new')
       expect(sandbox.status).toBe('ready')
+      expect(sandbox.protocolVersion).toBe('1')
       expect(sandbox.previewUrls).toEqual(new Map([
         [3000, 'https://sb-new-3000.preview.example.net']
       ]))
@@ -471,7 +481,8 @@ describe('Sandbox', () => {
           sandboxId: 'sb-get',
           status: 'running',
           cluster: 'cluster-b',
-          region: 'va6'
+          region: 'va6',
+          protocolVersion: '1'
         })
       })
 
@@ -484,6 +495,7 @@ describe('Sandbox', () => {
       expect(sandbox.id).toBe('sb-get')
       expect(sandbox.status).toBe('running')
       expect(sandbox.cluster).toBe('cluster-b')
+      expect(sandbox.protocolVersion).toBe('1')
     })
 
     test('stores idleTimeout from the get response on the instance', async () => {
@@ -600,6 +612,22 @@ describe('Sandbox', () => {
       sockets[0].open()
       sockets[0].closeWith(4001)
       await expect(p).rejects.toThrow(SandboxUnauthorizedError)
+    })
+
+    test('rejects on protocol mismatch close code 4003 with ProtocolVersionMismatchError', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      const p = sandbox.connect()
+      sockets[0].open()
+      sockets[0].closeWith(4003)
+      await expect(p).rejects.toThrow(ProtocolVersionMismatchError)
+    })
+
+    test('rejects on malformed frame close code 4004 with SandboxMalformedFrameError', async () => {
+      const sandbox = new Sandbox(BASE_OPTIONS)
+      const p = sandbox.connect()
+      sockets[0].open()
+      sockets[0].closeWith(4004)
+      await expect(p).rejects.toThrow(SandboxMalformedFrameError)
     })
 
     test('rejects on unexpected socket close', async () => {

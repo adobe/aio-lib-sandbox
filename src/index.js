@@ -10,6 +10,7 @@ governing permissions and limitations under the License.
 */
 
 const Sandbox = require('./Sandbox')
+const { PROTOCOL_VERSION } = require('./constants')
 const {
   SandboxSDKError,
   SandboxInitializationError,
@@ -20,11 +21,14 @@ const {
   SandboxWebSocketError,
   SandboxCommandNotFoundError,
   SandboxPortNotProvisionedError,
-  SandboxInvalidPortError
+  SandboxInvalidPortError,
+  ProtocolVersionMismatchError,
+  SandboxMalformedFrameError
 } = require('./errors')
 
 module.exports = {
   Sandbox,
+  SANDBOX_PROTOCOL_VERSION: PROTOCOL_VERSION,
   SandboxSDKError,
   SandboxInitializationError,
   SandboxClientError,
@@ -34,5 +38,7 @@ module.exports = {
   SandboxWebSocketError,
   SandboxCommandNotFoundError,
   SandboxPortNotProvisionedError,
-  SandboxInvalidPortError
+  SandboxInvalidPortError,
+  ProtocolVersionMismatchError,
+  SandboxMalformedFrameError
 }
