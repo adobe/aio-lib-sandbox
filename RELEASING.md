@@ -21,10 +21,10 @@ git checkout main && git pull
 1. **Run `np` with `--no-publish`** and the target version to bump the version, generate the changelog, create the git tag, and push without publishing to npm:
 
    ```bash
-   np 0.1.0-alpha.5 --no-publish 
+   np 0.1.0-alpha.10 --no-publish 
    ```
 
-   Replace `0.1.0-alpha.5` with the appropriate next version.
+   Replace `0.1.0-alpha.10` with the appropriate next version.
 
 2. In the popup GitHub browser window, add the release version as the title and create the new release.
 
@@ -32,5 +32,5 @@ git checkout main && git pull
 
 ## Notes
 
-- This package is in **alpha**. Prefer pre-release version increments (`alpha.x`) until the API is stable.
+- This package is in **alpha**. Prefer pre-release version increments (`alpha.x`) until the API is stable. It publishes to the `latest` npm dist-tag, so a bare `npm install` resolves to the current alpha.
 - If `np` complains about a dirty working tree or unpushed commits, resolve those before proceeding.

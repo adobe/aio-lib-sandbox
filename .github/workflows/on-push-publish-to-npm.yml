@@ -19,7 +19,20 @@ jobs:
       - run: npm install
       - run: npm test
       - uses: JS-DevTools/npm-publish@v3
+        id: publish
         with:
           token: ${{ secrets.ADOBE_BOT_NPM_TOKEN }}
-          tag: alpha
+          tag: latest
           access: public
+      # Keep the legacy `alpha` dist-tag moving in step with `latest` so that
+      # anyone still installing with `@alpha` keeps getting current releases.
+      - name: Sync the alpha dist-tag to the published version
+        if: steps.publish.outputs.type != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.ADOBE_BOT_NPM_TOKEN }}
+          PKG_ID: ${{ steps.publish.outputs.id }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          trap 'rm -f ~/.npmrc' EXIT
+          npm dist-tag add "${PKG_ID}" alpha
+          npm dist-tag ls @adobe/aio-lib-sandbox

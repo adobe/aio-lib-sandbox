@@ -5,14 +5,10 @@
 ![Node.js CI](https://github.com/adobe/aio-lib-sandbox/workflows/Node.js%20CI/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Codecov Coverage](https://img.shields.io/codecov/c/github/adobe/aio-lib-sandbox/main.svg?style=flat-square)](https://codecov.io/gh/adobe/aio-lib-sandbox/)
-![Status](https://img.shields.io/badge/status-alpha-orange.svg)
 
 JavaScript SDK for Adobe Runtime Sandboxes.
 
 A **sandbox** is an ephemeral, isolated compute environment. You create one, run commands and read/write files inside it over a WebSocket session, then destroy it.
-
-> [!WARNING]
-> **Alpha.** This SDK is in active alpha development. The API surface and authentication model may change without notice. Pin exact versions; do not rely on `latest`.
 
 ## Pre-requisites
 
@@ -21,7 +17,7 @@ To use this library, you must have Sandboxes enabled for your Runtime namespace.
 ## Install
 
 ```bash
-npm install @adobe/aio-lib-sandbox@alpha
+npm install @adobe/aio-lib-sandbox
 ```
 
 ## Quickstart
