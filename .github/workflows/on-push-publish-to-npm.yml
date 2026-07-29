@@ -27,12 +27,16 @@ jobs:
       # Keep the legacy `alpha` dist-tag moving in step with `latest` so that
       # anyone still installing with `@alpha` keeps getting current releases.
       - name: Sync the alpha dist-tag to the published version
-        if: steps.publish.outputs.type != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.ADOBE_BOT_NPM_TOKEN }}
-          PKG_ID: ${{ steps.publish.outputs.id }}
         run: |
           echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
           trap 'rm -f ~/.npmrc' EXIT
-          npm dist-tag add "${PKG_ID}" alpha
+          PKG_NAME="$(node -p "require('./package.json').name || ''")"
+          PKG_VERSION="$(node -p "require('./package.json').version || ''")"
+          if [ -z "${PKG_NAME}" ] || [ -z "${PKG_VERSION}" ]; then
+            echo "could not derive name and version from package.json" >&2
+            exit 1
+          fi
+          npm dist-tag add "${PKG_NAME}@${PKG_VERSION}" alpha
           npm dist-tag ls @adobe/aio-lib-sandbox
