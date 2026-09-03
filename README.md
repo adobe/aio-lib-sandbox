@@ -69,6 +69,7 @@ const { Sandbox } = require('@adobe/aio-lib-sandbox')
 
 const sandbox = await Sandbox.create({
   name:        'my-sandbox',
+  region:      'va6',
   type:        'cpu:default',
   idleTimeout: 900,
   maxLifetime: 3600,
@@ -76,6 +77,12 @@ const sandbox = await Sandbox.create({
   envs:        { API_KEY: 'your-api-key' }
 })
 ```
+
+The canonical sandbox API host is latency-routed and can send a request to a cluster outside the
+region named in the request body. When `region` is set, the SDK therefore routes the canonical host
+directly to that regional endpoint. Region identifiers use two to four letters followed by one or
+two digits and are normalized to lowercase. Custom and already-regional `apiHost` values are left
+unchanged. Omitting `region` preserves the default latency-routed API host behavior.
 
 #### Sandbox lifetime model
 

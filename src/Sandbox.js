@@ -21,6 +21,8 @@ const {
   buildWebSocketEndpoint,
   resolveCredentials,
   normalizeSize,
+  normalizeRegion,
+  routeSandboxApiHost,
   apiRequest
 } = require('./utils')
 const { SANDBOX_SIZES, PROTOCOL_VERSION, API_PREFIX } = require('./constants')
@@ -70,6 +72,8 @@ class Sandbox {
    * @param {string} [options.namespace] Runtime namespace (overrides `__OW_NAMESPACE`)
    * @param {string} [options.auth] Runtime API key (overrides `__OW_API_KEY`)
    * @param {string} [options.name] sandbox display name
+   * @param {string} [options.region] Runtime region identifier (for example, `'va6'`). When used
+   *   with a canonical sandbox API host, creation is routed directly to that regional endpoint.
    * @param {string} [options.type] sandbox type (default: `'cpu:default'`)
    * @param {string|object} [options.size] sandbox size tier (name or spec object)
    * @param {number} [options.idleTimeout] seconds of inactivity before the sandbox is terminated
@@ -83,6 +87,8 @@ class Sandbox {
    */
   static async create (options = {}) {
     const creds = resolveCredentials(options)
+    const region = options.region === undefined ? undefined : normalizeRegion(options.region)
+    const apiHost = routeSandboxApiHost(creds.apiHost, region)
 
     const body = {
       name: options.name,
@@ -93,16 +99,16 @@ class Sandbox {
     }
 
     if (options.cluster !== undefined) body.cluster = options.cluster
-    if (options.region !== undefined) body.region = options.region
+    if (region !== undefined) body.region = region
     if (options.envs !== undefined) body.envs = options.envs
     if (options.policy !== undefined) body.policy = options.policy
     if (options.ports !== undefined) body.ports = options.ports
 
-    const url = `${creds.apiHost}${API_PREFIX}/namespaces/${creds.namespace}/sandboxes`
+    const url = `${apiHost}${API_PREFIX}/namespaces/${creds.namespace}/sandboxes`
     const payload = await apiRequest('POST', url, creds.apiKey, body)
 
     const sandboxId = payload.sandboxId
-    const endpoint = payload.wsEndpoint || buildWebSocketEndpoint(creds.apiHost, creds.namespace, sandboxId)
+    const endpoint = payload.wsEndpoint || buildWebSocketEndpoint(apiHost, creds.namespace, sandboxId)
 
     const sandbox = new Sandbox({
       id: sandboxId,
@@ -116,7 +122,7 @@ class Sandbox {
       previewUrls: parsePreviewUrls(payload.previewUrls),
       managementEndpoint: payload.managementEndpoint || null,
       namespace: creds.namespace,
-      apiHost: creds.apiHost,
+      apiHost,
       apiKey: creds.apiKey,
       token: payload.token
     })
