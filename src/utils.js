@@ -18,6 +18,9 @@ const {
 } = require('./errors')
 const { SANDBOX_SIZES, API_PREFIX } = require('./constants')
 
+const SANDBOX_REGION_PATTERN = /^[a-z]{2,4}[0-9]{1,2}$/i
+const CANONICAL_SANDBOX_API_HOSTNAME = 'sandbox-adobeioruntime.net'
+
 /**
  * Builds a Basic authorization header from a Runtime API key.
  *
@@ -59,6 +62,48 @@ function normalizeApiHost (host) {
     return `https://${host}`
   }
   return host
+}
+
+/**
+ * Validates and normalizes a Runtime region identifier.
+ *
+ * @param {string} region Runtime region identifier
+ * @returns {string} lowercase Runtime region identifier
+ */
+function normalizeRegion (region) {
+  if (typeof region !== 'string' || !SANDBOX_REGION_PATTERN.test(region)) {
+    throw new SandboxClientError(
+      "Invalid sandbox region provided: expected 2-4 letters followed by 1-2 digits (for example, 'va6', 'irl1', 'jpn3', or 'aus3')"
+    )
+  }
+  return region.toLowerCase()
+}
+
+/**
+ * Routes canonical sandbox API hosts directly to the requested region.
+ *
+ * Custom, already-regional, and non-bare API hosts are returned unchanged.
+ *
+ * @param {string} apiHost normalized Runtime API host
+ * @param {string|undefined} region normalized Runtime region identifier
+ * @returns {string} effective Runtime API host
+ */
+function routeSandboxApiHost (apiHost, region) {
+  if (region === undefined) return apiHost
+
+  const url = new URL(apiHost)
+  const isCanonicalBareHost =
+    url.protocol === 'https:' &&
+    url.hostname === CANONICAL_SANDBOX_API_HOSTNAME &&
+    url.port === '' &&
+    url.username === '' &&
+    url.password === '' &&
+    url.pathname === '/' &&
+    url.search === '' &&
+    url.hash === ''
+
+  if (!isCanonicalBareHost) return apiHost
+  return `https://${region}.${url.hostname}`
 }
 
 /**
@@ -163,6 +208,8 @@ module.exports = {
   buildAuthorizationHeader,
   createSandboxHttpError,
   normalizeApiHost,
+  normalizeRegion,
+  routeSandboxApiHost,
   buildWebSocketEndpoint,
   resolveCredentials,
   normalizeSize,

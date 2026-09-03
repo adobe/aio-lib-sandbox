@@ -212,6 +212,161 @@ describe('Sandbox', () => {
   // -------------------------------------------------------------------------
 
   describe('Sandbox.create()', () => {
+    test('routes the canonical API host to the requested region', async () => {
+      const apiHost = 'https://sandbox-adobeioruntime.net'
+      const region = 'VA6'
+      const routedApiHost = 'https://va6.sandbox-adobeioruntime.net'
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-production',
+          wsEndpoint: 'wss://production.example.net/exec',
+          status: 'ready',
+          token: 'tok-production',
+          region: region.toLowerCase()
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        apiHost,
+        namespace: 'ns',
+        auth: 'uuid:key',
+        region
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-production' })
+      const sandbox = await createPromise
+
+      expect(mockFetch.mock.calls[0][0]).toBe(
+        `${routedApiHost}/api/v1/namespaces/ns/sandboxes`
+      )
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body).region).toBe(region.toLowerCase())
+      expect(sandbox.apiHost).toBe(routedApiHost)
+    })
+
+    test.each([
+      ['an already-regional host', 'https://va6.sandbox-adobeioruntime.net'],
+      ['a custom host', 'https://sandbox.example.net']
+    ])('does not rewrite %s', async (description, apiHost) => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-no-rewrite',
+          wsEndpoint: 'wss://runtime.example.net/exec',
+          status: 'ready',
+          token: 'tok-no-rewrite',
+          region: 'va6'
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        apiHost,
+        namespace: 'ns',
+        auth: 'uuid:key',
+        region: 'va6'
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-no-rewrite' })
+      const sandbox = await createPromise
+
+      expect(mockFetch.mock.calls[0][0]).toBe(
+        `${apiHost}/api/v1/namespaces/ns/sandboxes`
+      )
+      expect(sandbox.apiHost).toBe(apiHost)
+    })
+
+    test('does not rewrite a canonical API host when region is omitted', async () => {
+      const apiHost = 'https://sandbox-adobeioruntime.net'
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          sandboxId: 'sb-no-region',
+          wsEndpoint: 'wss://runtime.example.net/exec',
+          status: 'ready',
+          token: 'tok-no-region'
+        })
+      })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        apiHost,
+        namespace: 'ns',
+        auth: 'uuid:key'
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-no-region' })
+      const sandbox = await createPromise
+
+      expect(mockFetch.mock.calls[0][0]).toBe(
+        `${apiHost}/api/v1/namespaces/ns/sandboxes`
+      )
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).not.toHaveProperty('region')
+      expect(sandbox.apiHost).toBe(apiHost)
+    })
+
+    test.each(['', 'va6.evil.example', 'va_6', 6, null])(
+      'rejects malformed region %p before making a request',
+      async (region) => {
+        global.fetch = jest.fn()
+
+        await expect(Sandbox.create({
+          apiHost: 'https://sandbox-adobeioruntime.net',
+          namespace: 'ns',
+          auth: 'uuid:key',
+          region
+        })).rejects.toThrow(
+          "Invalid sandbox region provided: expected 2-4 letters followed by 1-2 digits (for example, 'va6', 'irl1', 'jpn3', or 'aus3')"
+        )
+
+        expect(global.fetch).not.toHaveBeenCalled()
+      }
+    )
+
+    test('retains the routed API host for fallback lifecycle requests', async () => {
+      const mockFetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            sandboxId: 'sb-lifecycle',
+            wsEndpoint: 'wss://runtime.example.net/exec',
+            status: 'ready',
+            token: 'tok-lifecycle',
+            region: 'va6'
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'destroyed' })
+        })
+      global.fetch = mockFetch
+
+      const createPromise = Sandbox.create({
+        apiHost: 'https://sandbox-adobeioruntime.net',
+        namespace: 'ns',
+        auth: 'uuid:key',
+        region: 'va6'
+      })
+
+      await new Promise(resolve => setImmediate(resolve))
+      sockets[0].open()
+      sockets[0].message({ type: 'auth.ok', sandboxId: 'sb-lifecycle' })
+      const sandbox = await createPromise
+      await sandbox.destroy()
+
+      expect(mockFetch.mock.calls[1][0]).toBe(
+        'https://va6.sandbox-adobeioruntime.net/api/v1/namespaces/ns/sandboxes/sb-lifecycle'
+      )
+      expect(mockFetch.mock.calls[1][1]).toEqual(expect.objectContaining({ method: 'DELETE' }))
+    })
+
     test('creates a sandbox and returns a connected instance', async () => {
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
